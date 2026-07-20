@@ -81,14 +81,16 @@ def run_versus(config: dict) -> None:
     pygame.init()
     disp = config["display"]
     screen = pygame.display.set_mode((disp["width"], disp["height"]))
-    pygame.display.set_caption("SHADOWCLASH — VS Villain Ladder")
+    pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     arena = screen.get_rect()
 
-    from shadowclash.ui.menu import run_settings_panel
+    from shadowclash.ui.menu import run_name_entry, run_settings_panel
 
-    if not run_settings_panel(
-        screen, config, "VILLAIN LADDER", "10 bosses — the camera stays off until you start"
+    player_name = run_name_entry(screen, config)
+    if player_name is None or not run_settings_panel(
+        screen, config, "SINGLE PLAYER",
+        "villain ladder: beat all 10 bosses (camera stays off until you start)",
     ):
         pygame.quit()
         return
@@ -188,17 +190,17 @@ def run_versus(config: dict) -> None:
             if player_won:
                 won_level = True
                 if level == len(VILLAINS) - 1:
-                    ko_message = "CHAMPION!"
-                    ko_sub = f"{villain_name} defeated — all 10 bosses down! R replay — Esc exit"
+                    ko_message = f"{player_name} IS CHAMPION!"
+                    ko_sub = f"{villain_name} defeated, all 10 bosses down! R replay, Esc exit"
                 else:
-                    ko_message = f"{villain_name} DOWN"
-                    ko_sub = f"R fight level {level + 2}: {VILLAINS[level + 1][0]} — Esc exit"
+                    ko_message = f"{player_name} WINS"
+                    ko_sub = f"{villain_name} down! R fight level {level + 2}: {VILLAINS[level + 1][0]}, Esc exit"
             elif player_lost:
                 ko_message = f"{villain_name} WINS"
-                ko_sub = "R retry — Esc exit"
+                ko_sub = f"{player_name} is down, R retry, Esc exit"
             elif seconds_left <= 0:
-                ko_message = "TIME — DRAW"
-                ko_sub = "R retry — Esc exit"
+                ko_message = "TIME UP: DRAW"
+                ko_sub = "R retry, Esc exit"
             if ko_message is not None:
                 bot.fighting = False  # the villain stops swinging after the round ends
                 sounds.ko()
@@ -212,10 +214,10 @@ def run_versus(config: dict) -> None:
         draw_skeleton(screen, bot_xy, villain_color, arena, visibility=bot_pose[:, 3])
         scene.update_and_draw_particles(screen, dt)
 
-        hud.draw_health_bar("YOU", damage.hp["A"], starting_hp)
+        hud.draw_health_bar(player_name, damage.hp["A"], starting_hp)
         hud.draw_health_bar(villain_name, damage.hp["B"], starting_hp, right=True)
         hud.draw_timer(seconds_left if ko_message is None else 0)
-        hud.draw_level_banner(f"LEVEL {level + 1}/{len(VILLAINS)} — {villain_name}")
+        hud.draw_level_banner(f"LEVEL {level + 1}/{len(VILLAINS)}: {villain_name}")
         hud.draw_popups()
 
         if local_xy is not None and ko_message is None:

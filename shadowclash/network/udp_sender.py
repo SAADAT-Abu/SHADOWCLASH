@@ -10,10 +10,17 @@ from shadowclash.network.protocol import DamageEvent, Packet
 
 
 class UdpSender:
-    def __init__(self, sock: socket.socket, player_id: int, target: tuple[str, int] | None = None):
+    def __init__(
+        self,
+        sock: socket.socket,
+        player_id: int,
+        target: tuple[str, int] | None = None,
+        player_name: str = "",
+    ):
         self.sock = sock
         self.player_id = player_id
         self.target = target
+        self.player_name = player_name
         self._seq = 0
         self._event_seq = 0
         self._pending_events: list[DamageEvent] = []
@@ -35,6 +42,7 @@ class UdpSender:
             timestamp_ms=int(time.monotonic() * 1000),
             pose=pose,
             events=list(self._pending_events),
+            name=self.player_name,
         )
         try:
             self.sock.sendto(protocol.pack(packet), self.target)

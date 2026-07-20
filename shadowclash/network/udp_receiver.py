@@ -24,6 +24,7 @@ class UdpReceiver:
         self._applied_event_seq = 0
         self._new_events: list[DamageEvent] = []
         self.peer_addr: tuple[str, int] | None = None
+        self.peer_name: str = ""
         self.last_rx_time: float = 0.0
         self._running = False
         self._thread: threading.Thread | None = None
@@ -63,6 +64,8 @@ class UdpReceiver:
                 continue
             with self._lock:
                 self.peer_addr = addr
+                if packet.name:
+                    self.peer_name = packet.name
                 self.last_rx_time = time.monotonic()
                 if packet.seq <= self._last_seq:
                     continue  # stale or duplicate datagram

@@ -28,14 +28,15 @@ def run_singleplayer(config: dict) -> None:
     pygame.init()
     disp = config["display"]
     screen = pygame.display.set_mode((disp["width"], disp["height"]))
-    pygame.display.set_caption("SHADOWCLASH — Training: Kicking Pole")
+    pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     arena = screen.get_rect()
 
     from shadowclash.ui.menu import run_settings_panel
 
     if not run_settings_panel(
-        screen, config, "KICKING POLE", "training mode — the camera stays off until you start"
+        screen, config, "TRAINING",
+        "kicking pole practice (camera stays off until you start)",
     ):
         pygame.quit()
         return

@@ -62,27 +62,34 @@ def run_multiplayer(
     pygame.init()
     disp = config["display"]
     screen = pygame.display.set_mode((disp["width"], disp["height"]))
-    pygame.display.set_caption(f"SHADOWCLASH — {'Host' if host else 'Join'}")
+    pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     arena = screen.get_rect()
 
-    from shadowclash.ui.menu import run_settings_panel, run_start_screen
+    from shadowclash.ui.menu import run_name_entry, run_settings_panel, run_start_screen
 
     # Bot input (loopback testing) skips the interactive panels entirely.
-    # Otherwise the match creator (host) gets the settings panel; the joiner
-    # just gets the start gate.
+    # Otherwise: name entry first, then the match creator (host) gets the
+    # settings panel; the joiner just gets the start gate.
+    player_name = "BOT"
     if input_source != "bot":
-        if host:
+        player_name = run_name_entry(screen, config)
+        proceed = player_name is not None
+        if proceed and host:
             proceed = run_settings_panel(
-                screen, config, "HOST MATCH", "the camera stays off until you start"
+                screen, config, "VS MODE (HOST)", "the camera stays off until you start"
             )
-        else:
-            proceed = run_start_screen(screen, "JOIN MATCH", "the camera stays off until you start")
+        elif proceed:
+            proceed = run_start_screen(
+                screen, "VS MODE (JOIN)", "the camera stays off until you start"
+            )
         if not proceed:
             receiver.stop()
             sock.close()
             pygame.quit()
             return
+
+    sender.player_name = player_name
 
     if input_source == "bot":
         capture = SyntheticPoseDriver(config)
@@ -168,15 +175,17 @@ def run_multiplayer(
 
         seconds_left = round_time - (now - round_start)
         if ko_message is None:
+            peer_name = receiver.peer_name or "OPPONENT"
             if damage.is_ko("A"):
-                ko_message = "KO — YOU LOSE"
+                ko_message = f"KO! {peer_name} WINS"
             elif damage.is_ko("B"):
-                ko_message = "KO — YOU WIN"
+                ko_message = f"KO! {player_name} WINS"
             elif seconds_left <= 0:
                 if damage.hp["A"] == damage.hp["B"]:
-                    ko_message = "TIME — DRAW"
+                    ko_message = "TIME UP: DRAW"
                 else:
-                    ko_message = "TIME — " + ("YOU WIN" if damage.hp["A"] > damage.hp["B"] else "YOU LOSE")
+                    winner = player_name if damage.hp["A"] > damage.hp["B"] else peer_name
+                    ko_message = f"TIME UP: {winner} WINS"
             if ko_message is not None:
                 sounds.ko()
                 log.info("Match over: %s", ko_message)
@@ -192,8 +201,8 @@ def run_multiplayer(
             draw_skeleton(screen, peer_xy, PEER_COLOR, arena, visibility=peer_pose[:, 3])
         scene.update_and_draw_particles(screen, dt)
 
-        hud.draw_health_bar("YOU", damage.hp["A"], starting_hp)
-        hud.draw_health_bar("OPPONENT", damage.hp["B"], starting_hp, right=True)
+        hud.draw_health_bar(player_name, damage.hp["A"], starting_hp)
+        hud.draw_health_bar(receiver.peer_name or "OPPONENT", damage.hp["B"], starting_hp, right=True)
         hud.draw_timer(seconds_left if ko_message is None else 0)
         hud.draw_popups()
 
@@ -208,7 +217,7 @@ def run_multiplayer(
         if sender.target is None:
             hud.draw_center_message("WAITING", f"share your IP: {local_ip()}:{port}")
         elif peer_lagging:
-            hud.draw_debug(["connection lag — peer avatar frozen"])
+            hud.draw_debug(["connection lag: peer avatar frozen"])
         if ko_message is not None:
             hud.draw_center_message(ko_message, "Esc to exit")
         pygame.display.flip()

@@ -1,5 +1,5 @@
-"""Main menu: mode select + IP entry for joining, keyboard-driven.
-Also the pre-fight start screen and the match creator's settings panel.
+"""Main menu: mode select with a VS Mode (Host/Join) submenu, IP entry,
+the pre-fight start screen, and the match creator's settings panel.
 All screens draw over the fight-scene backdrop for a consistent look."""
 
 import pygame
@@ -10,11 +10,23 @@ from shadowclash.skeleton.skeleton_renderer import draw_skeleton
 from shadowclash.ui import theme
 from shadowclash.ui.scene import FightScene
 
+MAIN_ITEMS = [
+    ("Single Player", "versus"),
+    ("Training", "singleplayer"),
+    ("VS Mode", "vs"),
+    ("Quit", "quit"),
+]
+VS_ITEMS = [
+    ("Host", "host"),
+    ("Join", "join"),
+    ("Back", "back"),
+]
+
 # (label, options shown, writer applying the chosen option index to config)
 SETTING_ROWS = [
     (
         "Hand tracking (fingers)",
-        ["Off — stylized hands, fastest", "On — real finger tracking"],
+        ["Off: stylized hands, fastest", "On: real finger tracking"],
         lambda config, i: config["pose"].__setitem__("hand_tracking", bool(i)),
     ),
     (
@@ -38,10 +50,11 @@ def _current_setting_values(config: dict) -> list[int]:
     ]
 
 
-def run_settings_panel(screen: pygame.Surface, config: dict, title: str, subtitle: str) -> bool:
+def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, subtitle: str) -> bool:
     """Match creator's settings panel + START button.
 
-    Shown before the camera turns on for singleplayer and host modes. The
+    The game title stays SHADOWCLASH; `mode_label` names the mode beneath it.
+    Shown before the camera turns on for single-player and host modes. The
     chosen values are written back into `config` when START is pressed.
     Returns True to start, False if the user quit.
     """
@@ -99,17 +112,19 @@ def run_settings_panel(screen: pygame.Surface, config: dict, title: str, subtitl
 
         mouse = pygame.mouse.get_pos()
         backdrop.draw_background(screen)
-        theme.draw_title(screen, title, subtitle)
+        theme.draw_title(screen, "SHADOWCLASH", subtitle)
         panel = pygame.Rect(cx - 450, rows_top - 60, 900, len(SETTING_ROWS) * row_h + 70)
         theme.draw_panel(screen, panel)
-        head = small.render("MATCH SETTINGS", True, theme.TEXT_DIM)
+        head = small.render(f"{mode_label} SETTINGS", True, theme.HIGHLIGHT)
         screen.blit(head, head.get_rect(midtop=(cx, rows_top - 46)))
 
         for i, (label, options, _) in enumerate(SETTING_ROWS):
             rect = row_rect(i)
-            active = selected == i or rect.collidepoint(mouse)
-            if active:
+            if rect.collidepoint(mouse):
+                selected = i
+            if selected == i:
                 pygame.draw.rect(screen, (44, 38, 58), rect, border_radius=8)
+                pygame.draw.rect(screen, theme.HIGHLIGHT, rect, 2, border_radius=8)
             label_color = theme.HIGHLIGHT if selected == i else theme.TEXT
             label_surf = row_font.render(label, True, label_color)
             screen.blit(label_surf, (rect.x + 16, rect.y + 12))
@@ -119,7 +134,7 @@ def run_settings_panel(screen: pygame.Surface, config: dict, title: str, subtitl
         hover = button.collidepoint(mouse) or selected == start_row
         theme.draw_button(screen, button, "START", hover)
         hint = small.render(
-            "arrows/WASD navigate — left/right or click changes a setting — START turns on the camera",
+            "arrows/WASD navigate, left/right or click changes a setting, START turns on the camera",
             True,
             theme.TEXT_DIM,
         )
@@ -129,9 +144,59 @@ def run_settings_panel(screen: pygame.Surface, config: dict, title: str, subtitl
         clock.tick(30)
 
 
-def run_start_screen(screen: pygame.Surface, title: str, subtitle: str) -> bool:
+def run_name_entry(screen: pygame.Surface, config: dict) -> str | None:
+    """Ask the player for their fight name (shown on the HUD and KO screen).
+
+    Returns the name, or None if the player quit. Enter with an empty box
+    uses PLAYER. The name is kept in config for this session so rematches
+    and mode switches remember it.
+    """
+    clock = pygame.time.Clock()
+    backdrop = FightScene(screen.get_size())
+    font = theme.font(48)
+    small = theme.font(30)
+    name = str(config.get("player_name", ""))
+    max_len = 12
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type != pygame.KEYDOWN:
+                continue
+            if event.key == pygame.K_ESCAPE:
+                return None
+            if event.key == pygame.K_RETURN:
+                final = name.strip() or "PLAYER"
+                config["player_name"] = final
+                return final
+            if event.key == pygame.K_BACKSPACE:
+                name = name[:-1]
+            elif event.unicode and len(name) < max_len and (
+                event.unicode.isalnum() or event.unicode in " -_"
+            ):
+                name += event.unicode.upper()
+
+        backdrop.draw_background(screen)
+        theme.draw_title(screen, "SHADOWCLASH", "who is fighting?")
+        panel = pygame.Rect(0, 0, 620, 150)
+        panel.center = screen.get_rect().center
+        theme.draw_panel(screen, panel)
+        head = small.render("ENTER YOUR NAME", True, theme.HIGHLIGHT)
+        screen.blit(head, head.get_rect(midtop=(panel.centerx, panel.y + 16)))
+        prompt = font.render((name or "PLAYER") + "_", True, theme.TEXT)
+        screen.blit(prompt, prompt.get_rect(center=(panel.centerx, panel.centery + 12)))
+        hint = small.render("Enter to confirm, Esc to cancel", True, theme.TEXT_DIM)
+        screen.blit(hint, hint.get_rect(midtop=(panel.centerx, panel.bottom + 14)))
+
+        pygame.display.flip()
+        clock.tick(30)
+
+
+def run_start_screen(screen: pygame.Surface, mode_label: str, subtitle: str) -> bool:
     """Show a START button; camera tracking begins only after it's pressed.
 
+    The game title stays SHADOWCLASH; `mode_label` names the mode beneath it.
     Returns True to start, False if the user quit. Click the button or
     press Space/Enter to start; Esc or closing the window quits.
     """
@@ -155,23 +220,17 @@ def run_start_screen(screen: pygame.Surface, title: str, subtitle: str) -> bool:
 
         hover = button.collidepoint(pygame.mouse.get_pos())
         backdrop.draw_background(screen)
-        theme.draw_title(screen, title, subtitle)
+        theme.draw_title(screen, "SHADOWCLASH", subtitle)
+        mode_surf = theme.font(44).render(mode_label, True, theme.HIGHLIGHT)
+        screen.blit(mode_surf, mode_surf.get_rect(midtop=(screen.get_width() // 2, 200)))
         theme.draw_button(screen, button, "START", hover)
         hint = theme.font(30).render(
-            "click START (or press Space) to turn on tracking — Esc quits", True, theme.TEXT_DIM
+            "click START or press Space to turn on tracking, Esc quits", True, theme.TEXT_DIM
         )
         screen.blit(hint, hint.get_rect(midtop=(button.centerx, button.bottom + 20)))
 
         pygame.display.flip()
         clock.tick(30)
-
-MENU_ITEMS = [
-    ("Versus — Shadow Fighter", "versus"),
-    ("Training — Kicking Pole", "singleplayer"),
-    ("Multiplayer — Host", "host"),
-    ("Multiplayer — Join", "join"),
-    ("Quit", "quit"),
-]
 
 
 def run_menu(config: dict) -> tuple[str, str | None]:
@@ -185,20 +244,33 @@ def run_menu(config: dict) -> tuple[str, str | None]:
     mascot = SyntheticPoseDriver(seed=11, attack_interval=(1.2, 2.4))
     font = theme.font(48)
     small = theme.font(30)
+    cx = screen.get_width() // 2
 
+    items = MAIN_ITEMS
     selected = 0
     entering_ip = False
     ip_text = ""
 
-    panel = pygame.Rect(0, 0, 560, len(MENU_ITEMS) * 70 + 50)
-    panel.midtop = (screen.get_width() // 2, 260)
+    def panel_rect() -> pygame.Rect:
+        rect = pygame.Rect(0, 0, 560, len(items) * 70 + 50)
+        rect.midtop = (cx, 260)
+        return rect
 
     def item_rect(i: int) -> pygame.Rect:
+        panel = panel_rect()
         return pygame.Rect(panel.x + 20, panel.y + 22 + i * 70, panel.width - 40, 58)
 
     def activate(i: int) -> tuple[str, str | None] | None:
-        nonlocal entering_ip
-        mode = MENU_ITEMS[i][1]
+        nonlocal entering_ip, items, selected
+        mode = items[i][1]
+        if mode == "vs":
+            items = VS_ITEMS
+            selected = 0
+            return None
+        if mode == "back":
+            items = MAIN_ITEMS
+            selected = 0
+            return None
         if mode == "join":
             entering_ip = True
             return None
@@ -222,21 +294,25 @@ def run_menu(config: dict) -> tuple[str, str | None]:
                     ip_text += event.unicode
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    return "quit", None
+                    if items is VS_ITEMS:
+                        items = MAIN_ITEMS
+                        selected = 0
+                    else:
+                        return "quit", None
                 elif event.key in (pygame.K_UP, pygame.K_w):
-                    selected = (selected - 1) % len(MENU_ITEMS)
+                    selected = (selected - 1) % len(items)
                 elif event.key in (pygame.K_DOWN, pygame.K_s):
-                    selected = (selected + 1) % len(MENU_ITEMS)
+                    selected = (selected + 1) % len(items)
                 elif event.key == pygame.K_RETURN:
                     result = activate(selected)
                     if result is not None:
                         return result
             elif event.type == pygame.MOUSEMOTION:
-                for i in range(len(MENU_ITEMS)):
+                for i in range(len(items)):
                     if item_rect(i).collidepoint(event.pos):
                         selected = i
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                for i in range(len(MENU_ITEMS)):
+                for i in range(len(items)):
                     if item_rect(i).collidepoint(event.pos):
                         selected = i
                         result = activate(i)
@@ -252,6 +328,7 @@ def run_menu(config: dict) -> tuple[str, str | None]:
         backdrop.draw_fighter_shadow(screen, mascot_xy, screen.get_rect())
         draw_skeleton(screen, mascot_xy, (58, 44, 74), screen.get_rect(),
                       visibility=mascot_pose[:, 3])
+
         theme.draw_title(
             screen, "SHADOWCLASH", "Your body is the controller. Your shadow is your fighter."
         )
@@ -265,21 +342,26 @@ def run_menu(config: dict) -> tuple[str, str | None]:
             hint = small.render("Enter to connect, Esc to cancel", True, theme.TEXT_DIM)
             screen.blit(hint, hint.get_rect(midtop=(ip_panel.centerx, ip_panel.centery + 25)))
         else:
-            theme.draw_panel(screen, panel)
-            for i, (label, _) in enumerate(MENU_ITEMS):
+            theme.draw_panel(screen, panel_rect())
+            if items is VS_ITEMS:
+                head = small.render("VS MODE", True, theme.TEXT_DIM)
+                screen.blit(head, head.get_rect(midbottom=(cx, panel_rect().y - 8)))
+            for i, (label, _) in enumerate(items):
                 rect = item_rect(i)
                 if i == selected:
                     pygame.draw.rect(screen, (44, 38, 58), rect, border_radius=8)
+                    pygame.draw.rect(screen, theme.HIGHLIGHT, rect, 3, border_radius=8)
                 color = theme.HIGHLIGHT if i == selected else theme.TEXT
-                prefix = "> " if i == selected else "   "
-                surf = font.render(prefix + label, True, color)
-                screen.blit(surf, (rect.x + 30, rect.y + 10))
+                surf = font.render(label, True, color)
+                screen.blit(surf, surf.get_rect(center=rect.center))
             footer = small.render(
-                "arrows or mouse to choose — Enter/click to select — Esc quits", True, theme.TEXT_DIM
+                "arrows or mouse to choose, Enter or click to select, Esc to go back or quit",
+                True,
+                theme.TEXT_DIM,
             )
             screen.blit(
                 footer,
-                footer.get_rect(midbottom=(screen.get_width() // 2, screen.get_height() - 18)),
+                footer.get_rect(midbottom=(cx, screen.get_height() - 18)),
             )
 
         pygame.display.flip()

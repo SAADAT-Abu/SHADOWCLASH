@@ -12,10 +12,12 @@ def test_roundtrip_with_pose_and_events():
         timestamp_ms=123456789,
         pose=pose,
         events=[DamageEvent(3, "head", True, 4.5), DamageEvent(4, "leg", False, 4.0)],
+        name="SAADAT",
     )
     out = protocol.unpack(protocol.pack(packet))
     assert out is not None
     assert (out.player_id, out.seq, out.timestamp_ms) == (1, 42, 123456789)
+    assert out.name == "SAADAT"
     assert np.allclose(out.pose, pose, atol=1e-6)  # float32 on the wire
     assert out.events == [DamageEvent(3, "head", True, 4.5), DamageEvent(4, "leg", False, 4.0)]
 
@@ -26,6 +28,14 @@ def test_roundtrip_without_pose():
     assert out is not None
     assert out.pose is None
     assert out.events == []
+
+
+def test_name_truncated_to_wire_limit():
+    packet = Packet(0, 1, 0, None, [], name="A VERY LONG FIGHTER NAME")
+    out = protocol.unpack(protocol.pack(packet))
+    assert out.name == "A VERY LONG "[: protocol.NAME_LEN]
+    # Empty name survives the roundtrip too
+    assert protocol.unpack(protocol.pack(Packet(0, 1, 0, None, []))).name == ""
 
 
 def test_rejects_garbage_and_truncated():

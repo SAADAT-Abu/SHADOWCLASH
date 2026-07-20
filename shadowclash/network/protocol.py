@@ -1,7 +1,8 @@
 """Binary UDP packet format (struct-packed, see DECISIONS.md D-004/D-006).
 
 Layout (network byte order):
-  header:  4s magic 'SHCL' | B version | B player_id | I packet seq | Q timestamp ms
+  header:  4s magic 'SHCL' | B version | B player_id | 12s player name
+           (utf-8, null-padded) | I packet seq | Q timestamp ms
   pose:    B has_pose | 75 * 4 float32 (x, y, z, visibility), zeros if no pose
            (75 = 33 pose + 2x21 Holistic hand landmarks, D-011)
   events:  B count | count * (I event_seq | B zone_id | B blocked | f damage)
@@ -19,10 +20,11 @@ import numpy as np
 from shadowclash.skeleton.skeleton_model import TOTAL_LANDMARKS
 
 MAGIC = b"SHCL"
-VERSION = 2  # v2: 75 landmarks (33 pose + 2x21 Holistic hands, D-011)
+VERSION = 3  # v3: player name in header; v2: 75 landmarks (D-011)
 NUM_LANDMARKS = TOTAL_LANDMARKS
+NAME_LEN = 12
 
-_HEADER = struct.Struct("!4sBBIQ")
+_HEADER = struct.Struct(f"!4sBB{NAME_LEN}sIQ")
 _POSE = struct.Struct(f"!B{NUM_LANDMARKS * 4}f")
 _EVENT_COUNT = struct.Struct("!B")
 _EVENT = struct.Struct("!IBBf")
@@ -44,12 +46,16 @@ class Packet:
     player_id: int
     seq: int
     timestamp_ms: int
-    pose: np.ndarray | None  # (33, 4) or None
+    pose: np.ndarray | None  # (NUM_LANDMARKS, 4) or None
     events: list[DamageEvent]
+    name: str = ""
 
 
 def pack(packet: Packet) -> bytes:
-    out = _HEADER.pack(MAGIC, VERSION, packet.player_id, packet.seq, packet.timestamp_ms)
+    name_bytes = packet.name.encode("utf-8")[:NAME_LEN].ljust(NAME_LEN, b"\0")
+    out = _HEADER.pack(
+        MAGIC, VERSION, packet.player_id, name_bytes, packet.seq, packet.timestamp_ms
+    )
     if packet.pose is not None:
         flat = np.asarray(packet.pose, dtype=np.float32).reshape(-1)
         out += _POSE.pack(1, *flat)
@@ -65,9 +71,10 @@ def unpack(data: bytes) -> Packet | None:
     """Parse a datagram; returns None for anything malformed or foreign."""
     if len(data) < _HEADER.size + _POSE.size + _EVENT_COUNT.size:
         return None
-    magic, version, player_id, seq, ts = _HEADER.unpack_from(data, 0)
+    magic, version, player_id, name_bytes, seq, ts = _HEADER.unpack_from(data, 0)
     if magic != MAGIC or version != VERSION:
         return None
+    name = name_bytes.rstrip(b"\0").decode("utf-8", errors="ignore")
     offset = _HEADER.size
     pose_fields = _POSE.unpack_from(data, offset)
     offset += _POSE.size
@@ -85,4 +92,4 @@ def unpack(data: bytes) -> Packet | None:
         if zone_id not in ZONE_NAMES:
             return None
         events.append(DamageEvent(ev_seq, ZONE_NAMES[zone_id], bool(blocked), damage))
-    return Packet(player_id, seq, ts, pose, events)
+    return Packet(player_id, seq, ts, pose, events, name)
