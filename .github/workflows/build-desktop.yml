@@ -9,6 +9,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write  # required for the release-attach step
+
 jobs:
   build:
     strategy:
