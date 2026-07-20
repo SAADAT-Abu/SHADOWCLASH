@@ -62,10 +62,12 @@ class Hud:
             y += 20
 
     def draw_center_message(self, text: str, sub: str | None = None) -> None:
-        cx = self.screen.get_width() // 2
-        cy = self.screen.get_height() // 2
-        surf = self.big_font.render(text, True, (255, 60, 60))
+        from shadowclash.ui.theme import render_fit
+
+        w = self.screen.get_width()
+        cx, cy = w // 2, self.screen.get_height() // 2
+        surf = render_fit(text, 96, (255, 60, 60), w - 60)
         self.screen.blit(surf, surf.get_rect(center=(cx, cy)))
         if sub:
-            sub_surf = self.font.render(sub, True, (255, 255, 255))
+            sub_surf = render_fit(sub, 28, (255, 255, 255), w - 60)
             self.screen.blit(sub_surf, sub_surf.get_rect(center=(cx, cy + 70)))

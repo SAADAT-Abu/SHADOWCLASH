@@ -25,7 +25,12 @@ packet, and the joiner's NAT allows the reply because it initiated).
 - **Effort:** none in code; per-player router fiddling, breaks with CGNAT.
 - **Verdict:** viable fallback, poor UX. Document, don't build on it.
 
-## Option 3 — Rendezvous server + UDP hole punching — the proper v2 feature
+## Option 3 — Rendezvous server + UDP hole punching — ✅ IMPLEMENTED (D-016)
+Live on the user's VPS at 65.20.110.24:5556/udp (`shadowclash-rendezvous`
+systemd service, source: `shadowclash/network/rendezvous_server.py`). Hosts
+show a 6-char room token on the WAITING screen; joiners type either a LAN IP
+or that token into the same field. The original design notes follow.
+
 A tiny public "matchmaker" on a cheap VPS (~50 lines of Python, UDP):
 
 1. Host sends `REGISTER <room-code>` to the server; server records the host's

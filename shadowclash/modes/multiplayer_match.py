@@ -1,4 +1,8 @@
-"""Two-player LAN match: local pose vs peer pose streamed over UDP.
+"""Two-player match: local pose vs peer pose streamed over UDP.
+
+Works on LAN (join by IP) or across the internet (join by room token via the
+rendezvous server + UDP hole punching, DECISIONS.md D-016). The join input
+is auto-detected: dotted-quad means IP, anything else is a token.
 
 Damage authority (DECISIONS.md D-004): this client computes only the damage
 its LOCAL player deals, applies it locally, and broadcasts it as damage
@@ -13,6 +17,7 @@ import pygame
 from shadowclash.capture.pose_capture import PoseCapture
 from shadowclash.capture.synthetic_pose import SyntheticPoseDriver
 from shadowclash.modes.singleplayer_vs import distance_hint, hit_zone_px
+from shadowclash.network.rendezvous import RendezvousClient, is_ip, local_ip
 from shadowclash.network.udp_receiver import UdpReceiver
 from shadowclash.network.udp_sender import UdpSender
 from shadowclash.physics.collision_engine import CollisionEngine
@@ -31,25 +36,26 @@ LOCAL_COLOR = (70, 160, 255)
 PEER_COLOR = (255, 100, 90)
 
 
-def local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
-    finally:
-        s.close()
-
-
 def run_multiplayer(
     config: dict, host: bool, ip: str | None, port: int, input_source: str = "camera"
 ) -> None:
+    """`ip` is the join target: an IPv4 address (LAN) or a room token."""
+    net_cfg = config["network"]
+    rdv_server = None
+    if net_cfg.get("rendezvous_host"):
+        rdv_server = (net_cfg["rendezvous_host"], net_cfg.get("rendezvous_port", 5556))
+
+    join_token = None if host or ip is None or is_ip(ip) else ip.strip().upper()
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     if host:
         sock.bind(("", port))
-        log.info("Hosting on %s:%s — waiting for peer packets", local_ip(), port)
-        target = None  # learned from the first received packet
+        log.info("Hosting on %s:%s, waiting for peer packets", local_ip(), port)
+        target = None  # learned from the first received packet or rendezvous
+    elif join_token is not None:
+        sock.bind(("", 0))
+        target = None  # resolved via the rendezvous server
+        log.info("Joining room token %s via %s", join_token, rdv_server)
     else:
         sock.bind(("", 0))
         target = (ip, port)
@@ -59,9 +65,22 @@ def run_multiplayer(
     receiver.start()
     sender = UdpSender(sock, player_id=0 if host else 1, target=target)
 
+    rdv = None
+    if rdv_server is not None and (host or join_token is not None):
+        rdv = RendezvousClient(sock, receiver, rdv_server)
+        if host:
+            rdv.start_host()
+        else:
+            rdv.start_join(join_token)
+    elif join_token is not None:
+        log.error("Token join requested but no rendezvous server configured")
+        sock.close()
+        receiver.stop()
+        return
+
     pygame.init()
     disp = config["display"]
-    screen = pygame.display.set_mode((disp["width"], disp["height"]))
+    screen = pygame.display.set_mode((disp["width"], disp["height"]), pygame.RESIZABLE)
     pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     arena = screen.get_rect()
@@ -84,9 +103,10 @@ def run_multiplayer(
                 screen, "VS MODE (JOIN)", "the camera stays off until you start"
             )
         if not proceed:
+            if rdv is not None:
+                rdv.close()
             receiver.stop()
             sock.close()
-            pygame.quit()
             return
 
     sender.player_name = player_name
@@ -115,12 +135,16 @@ def run_multiplayer(
     round_start = time.monotonic()
     last_send = 0.0
     ko_message: str | None = None
+    token_logged = False
     running = True
 
     while running:
         dt = clock.tick(disp["fps"]) / 1000.0
         now = time.monotonic()
         now_ms = now * 1000.0
+        arena = screen.get_rect()
+        if scene.size != arena.size:
+            scene = FightScene(arena.size)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -128,10 +152,24 @@ def run_multiplayer(
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
 
-        if host and sender.target is None and receiver.peer_addr is not None:
-            sender.target = receiver.peer_addr
-            log.info("Peer connected from %s", receiver.peer_addr)
-            round_start = now
+        if rdv is not None:
+            rdv.update(now)
+            if host and rdv.token and not token_logged:
+                token_logged = True
+                log.info("Room token: %s", rdv.token)
+
+        # Lock onto the address real game packets arrive from; until then,
+        # punch toward every candidate endpoint the rendezvous supplied
+        if receiver.peer_addr is not None:
+            if sender.target != receiver.peer_addr:
+                sender.target = receiver.peer_addr
+                sender.punch_targets = []
+                log.info("Peer connected from %s", receiver.peer_addr)
+                round_start = now
+        elif rdv is not None and rdv.peers and sender.target is None:
+            sender.target = rdv.peers[0]
+            sender.punch_targets = list(rdv.peers[1:])
+            log.info("Hole punching toward %s", rdv.peers)
 
         local_pose, _ = capture.get_pose()
         peer_pose, last_rx = receiver.get_pose()
@@ -214,15 +252,26 @@ def run_multiplayer(
             if hint is not None:
                 hud.draw_distance_hint(hint)
 
-        if sender.target is None:
-            hud.draw_center_message("WAITING", f"share your IP: {local_ip()}:{port}")
+        if not peer_seen:
+            if host:
+                token_str = rdv.token if rdv is not None and rdv.token else "..."
+                hud.draw_center_message(
+                    "WAITING",
+                    f"LAN: {local_ip()}:{port}  or room token: {token_str}  (Esc cancels)",
+                )
+            elif join_token is not None:
+                if rdv is not None and rdv.error:
+                    hud.draw_center_message("TOKEN NOT FOUND", "check the code, Esc to go back")
+                else:
+                    hud.draw_center_message("CONNECTING", f"room token {join_token} (Esc cancels)")
         elif peer_lagging:
             hud.draw_debug(["connection lag: peer avatar frozen"])
         if ko_message is not None:
             hud.draw_center_message(ko_message, "Esc to exit")
         pygame.display.flip()
 
+    if rdv is not None:
+        rdv.close()  # host: tell the server to drop the room immediately
     receiver.stop()
     capture.stop()
     sock.close()
-    pygame.quit()

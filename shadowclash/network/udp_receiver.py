@@ -26,6 +26,10 @@ class UdpReceiver:
         self.peer_addr: tuple[str, int] | None = None
         self.peer_name: str = ""
         self.last_rx_time: float = 0.0
+        # Rendezvous replies (SHRV1 datagrams share the game socket)
+        self.rdv_token: str | None = None
+        self.rdv_peers: list[tuple[str, int]] = []
+        self.rdv_error: str | None = None
         self._running = False
         self._thread: threading.Thread | None = None
 
@@ -51,6 +55,22 @@ class UdpReceiver:
             events, self._new_events = self._new_events, []
             return events
 
+    def _handle_rendezvous(self, data: bytes) -> None:
+        from shadowclash.network.rendezvous import parse_endpoint
+
+        parts = data.decode("utf-8", errors="ignore").split()
+        if len(parts) < 2:
+            return
+        with self._lock:
+            if parts[1] == "TOKEN" and len(parts) >= 3:
+                self.rdv_token = parts[2]
+            elif parts[1] == "PEER":
+                peers = [ep for ep in map(parse_endpoint, parts[2:]) if ep is not None]
+                if peers:
+                    self.rdv_peers = peers
+            elif parts[1] == "ERR":
+                self.rdv_error = " ".join(parts[2:]) or "error"
+
     def _recv_loop(self) -> None:
         while self._running:
             try:
@@ -59,6 +79,9 @@ class UdpReceiver:
                 continue
             except OSError:
                 break
+            if data.startswith(b"SHRV1 "):
+                self._handle_rendezvous(data)
+                continue
             packet = protocol.unpack(data)
             if packet is None:
                 continue

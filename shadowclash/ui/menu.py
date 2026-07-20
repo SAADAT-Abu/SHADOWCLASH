@@ -60,7 +60,6 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
     """
     clock = pygame.time.Clock()
     backdrop = FightScene(screen.get_size())
-    row_font = theme.font(40)
     small = theme.font(30)
 
     values = _current_setting_values(config)
@@ -70,10 +69,10 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
     rows_top = 260
     row_h = 64
     button = pygame.Rect(0, 0, 340, 80)
-    button.center = (cx, rows_top + start_row * row_h + 90)
 
     def row_rect(i: int) -> pygame.Rect:
-        return pygame.Rect(cx - 420, rows_top + i * row_h - 8, 840, row_h - 12)
+        half = min(450, screen.get_width() // 2 - 20)
+        return pygame.Rect(cx - half + 30, rows_top + i * row_h - 8, half * 2 - 60, row_h - 12)
 
     def cycle(i: int, direction: int) -> None:
         values[i] = (values[i] + direction) % len(SETTING_ROWS[i][1])
@@ -84,6 +83,10 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
         return True
 
     while True:
+        cx = screen.get_width() // 2
+        if backdrop.size != screen.get_size():
+            backdrop = FightScene(screen.get_size())
+        button.center = (cx, rows_top + start_row * row_h + 90)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -113,7 +116,8 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
         mouse = pygame.mouse.get_pos()
         backdrop.draw_background(screen)
         theme.draw_title(screen, "SHADOWCLASH", subtitle)
-        panel = pygame.Rect(cx - 450, rows_top - 60, 900, len(SETTING_ROWS) * row_h + 70)
+        half = min(450, screen.get_width() // 2 - 20)
+        panel = pygame.Rect(cx - half, rows_top - 60, half * 2, len(SETTING_ROWS) * row_h + 70)
         theme.draw_panel(screen, panel)
         head = small.render(f"{mode_label} SETTINGS", True, theme.HIGHLIGHT)
         screen.blit(head, head.get_rect(midtop=(cx, rows_top - 46)))
@@ -126,17 +130,18 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
                 pygame.draw.rect(screen, (44, 38, 58), rect, border_radius=8)
                 pygame.draw.rect(screen, theme.HIGHLIGHT, rect, 2, border_radius=8)
             label_color = theme.HIGHLIGHT if selected == i else theme.TEXT
-            label_surf = row_font.render(label, True, label_color)
-            screen.blit(label_surf, (rect.x + 16, rect.y + 12))
-            value_surf = row_font.render("<  " + options[values[i]] + "  >", True, theme.VALUE)
+            label_surf = theme.render_fit(label, 40, label_color, int(rect.width * 0.42))
+            screen.blit(label_surf, (rect.x + 16, rect.centery - label_surf.get_height() // 2))
+            value_surf = theme.render_fit(
+                "<  " + options[values[i]] + "  >", 40, theme.VALUE, int(rect.width * 0.52)
+            )
             screen.blit(value_surf, value_surf.get_rect(midright=(rect.right - 16, rect.centery)))
 
         hover = button.collidepoint(mouse) or selected == start_row
         theme.draw_button(screen, button, "START", hover)
-        hint = small.render(
+        hint = theme.render_fit(
             "arrows/WASD navigate, left/right or click changes a setting, START turns on the camera",
-            True,
-            theme.TEXT_DIM,
+            30, theme.TEXT_DIM, screen.get_width() - 60,
         )
         screen.blit(hint, hint.get_rect(midtop=(cx, button.bottom + 18)))
 
@@ -177,14 +182,16 @@ def run_name_entry(screen: pygame.Surface, config: dict) -> str | None:
             ):
                 name += event.unicode.upper()
 
+        if backdrop.size != screen.get_size():
+            backdrop = FightScene(screen.get_size())
         backdrop.draw_background(screen)
         theme.draw_title(screen, "SHADOWCLASH", "who is fighting?")
-        panel = pygame.Rect(0, 0, 620, 150)
+        panel = pygame.Rect(0, 0, min(620, screen.get_width() - 60), 150)
         panel.center = screen.get_rect().center
         theme.draw_panel(screen, panel)
         head = small.render("ENTER YOUR NAME", True, theme.HIGHLIGHT)
         screen.blit(head, head.get_rect(midtop=(panel.centerx, panel.y + 16)))
-        prompt = font.render((name or "PLAYER") + "_", True, theme.TEXT)
+        prompt = theme.render_fit((name or "PLAYER") + "_", 48, theme.TEXT, panel.width - 40)
         screen.blit(prompt, prompt.get_rect(center=(panel.centerx, panel.centery + 12)))
         hint = small.render("Enter to confirm, Esc to cancel", True, theme.TEXT_DIM)
         screen.blit(hint, hint.get_rect(midtop=(panel.centerx, panel.bottom + 14)))
@@ -203,9 +210,11 @@ def run_start_screen(screen: pygame.Surface, mode_label: str, subtitle: str) -> 
     clock = pygame.time.Clock()
     backdrop = FightScene(screen.get_size())
     button = pygame.Rect(0, 0, 340, 90)
-    button.center = (screen.get_width() // 2, int(screen.get_height() * 0.62))
 
     while True:
+        if backdrop.size != screen.get_size():
+            backdrop = FightScene(screen.get_size())
+        button.center = (screen.get_width() // 2, int(screen.get_height() * 0.62))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -221,11 +230,12 @@ def run_start_screen(screen: pygame.Surface, mode_label: str, subtitle: str) -> 
         hover = button.collidepoint(pygame.mouse.get_pos())
         backdrop.draw_background(screen)
         theme.draw_title(screen, "SHADOWCLASH", subtitle)
-        mode_surf = theme.font(44).render(mode_label, True, theme.HIGHLIGHT)
+        mode_surf = theme.render_fit(mode_label, 44, theme.HIGHLIGHT, screen.get_width() - 60)
         screen.blit(mode_surf, mode_surf.get_rect(midtop=(screen.get_width() // 2, 200)))
         theme.draw_button(screen, button, "START", hover)
-        hint = theme.font(30).render(
-            "click START or press Space to turn on tracking, Esc quits", True, theme.TEXT_DIM
+        hint = theme.render_fit(
+            "click START or press Space to turn on tracking, Esc quits",
+            30, theme.TEXT_DIM, screen.get_width() - 60,
         )
         screen.blit(hint, hint.get_rect(midtop=(button.centerx, button.bottom + 20)))
 
@@ -237,7 +247,7 @@ def run_menu(config: dict) -> tuple[str, str | None]:
     """Returns (mode, ip). ip is set only for join mode."""
     pygame.init()
     disp = config["display"]
-    screen = pygame.display.set_mode((disp["width"], disp["height"]))
+    screen = pygame.display.set_mode((disp["width"], disp["height"]), pygame.RESIZABLE)
     pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     backdrop = FightScene(screen.get_size())
@@ -277,6 +287,9 @@ def run_menu(config: dict) -> tuple[str, str | None]:
         return mode, None
 
     while True:
+        cx = screen.get_width() // 2
+        if backdrop.size != screen.get_size():
+            backdrop = FightScene(screen.get_size())
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit", None
@@ -290,7 +303,7 @@ def run_menu(config: dict) -> tuple[str, str | None]:
                     ip_text = ""
                 elif event.key == pygame.K_BACKSPACE:
                     ip_text = ip_text[:-1]
-                elif event.unicode and (event.unicode.isdigit() or event.unicode == "."):
+                elif event.unicode and (event.unicode.isalnum() or event.unicode == "."):
                     ip_text += event.unicode
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -334,13 +347,18 @@ def run_menu(config: dict) -> tuple[str, str | None]:
         )
 
         if entering_ip:
-            ip_panel = pygame.Rect(0, 0, 620, 140)
+            ip_panel = pygame.Rect(0, 0, min(820, screen.get_width() - 60), 150)
             ip_panel.center = screen.get_rect().center
             theme.draw_panel(screen, ip_panel)
-            prompt = font.render("Host IP: " + ip_text + "_", True, theme.TEXT)
-            screen.blit(prompt, prompt.get_rect(center=(ip_panel.centerx, ip_panel.centery - 15)))
-            hint = small.render("Enter to connect, Esc to cancel", True, theme.TEXT_DIM)
-            screen.blit(hint, hint.get_rect(midtop=(ip_panel.centerx, ip_panel.centery + 25)))
+            prompt = theme.render_fit(
+                "Host IP or token: " + ip_text + "_", 48, theme.TEXT, ip_panel.width - 40
+            )
+            screen.blit(prompt, prompt.get_rect(center=(ip_panel.centerx, ip_panel.centery - 20)))
+            hint = theme.render_fit(
+                "LAN address (192.168.x.x) or the host's room token, Enter to connect",
+                30, theme.TEXT_DIM, ip_panel.width - 40,
+            )
+            screen.blit(hint, hint.get_rect(midtop=(ip_panel.centerx, ip_panel.centery + 20)))
         else:
             theme.draw_panel(screen, panel_rect())
             if items is VS_ITEMS:

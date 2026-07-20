@@ -27,7 +27,7 @@ PLAYER_COLOR = (70, 160, 255)
 def run_singleplayer(config: dict) -> None:
     pygame.init()
     disp = config["display"]
-    screen = pygame.display.set_mode((disp["width"], disp["height"]))
+    screen = pygame.display.set_mode((disp["width"], disp["height"]), pygame.RESIZABLE)
     pygame.display.set_caption("SHADOWCLASH")
     clock = pygame.time.Clock()
     arena = screen.get_rect()
@@ -38,7 +38,6 @@ def run_singleplayer(config: dict) -> None:
         screen, config, "TRAINING",
         "kicking pole practice (camera stays off until you start)",
     ):
-        pygame.quit()
         return
 
     capture = PoseCapture(config)
@@ -65,6 +64,9 @@ def run_singleplayer(config: dict) -> None:
     while running:
         dt = clock.tick(disp["fps"]) / 1000.0
         now_ms = time.monotonic() * 1000.0
+        arena = screen.get_rect()
+        if scene.size != arena.size:
+            scene = FightScene(arena.size)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -122,4 +124,3 @@ def run_singleplayer(config: dict) -> None:
         pygame.display.flip()
 
     capture.stop()
-    pygame.quit()

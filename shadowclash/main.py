@@ -17,7 +17,7 @@ def main() -> None:
         help="menu (default), posecheck (M1 camera sanity check), singleplayer "
         "(pole training), versus (fight the shadow bot), host, join",
     )
-    parser.add_argument("--ip", help="host IP for join mode")
+    parser.add_argument("--ip", help="join target: host IP (LAN) or room token (internet)")
     parser.add_argument("--port", type=int, help="UDP port (default from config)")
     parser.add_argument("--config", help="path to game_config.yaml")
     parser.add_argument(
@@ -30,34 +30,46 @@ def main() -> None:
 
     config = load_config(args.config)
     port = args.port or config["network"]["default_port"]
-    mode, ip = args.mode, args.ip
 
-    if mode == "menu":
-        from shadowclash.ui.menu import run_menu
+    def run_mode(mode: str, ip: str | None) -> None:
+        if mode == "posecheck":
+            from shadowclash.capture.pose_capture import run_posecheck
 
-        mode, menu_ip = run_menu(config)
-        ip = menu_ip or ip
-        if mode == "quit":
-            return
+            run_posecheck(config)
+        elif mode == "singleplayer":
+            from shadowclash.modes.singleplayer_pole import run_singleplayer
 
-    if mode == "posecheck":
-        from shadowclash.capture.pose_capture import run_posecheck
+            run_singleplayer(config)
+        elif mode == "versus":
+            from shadowclash.modes.singleplayer_vs import run_versus
 
-        run_posecheck(config)
-    elif mode == "singleplayer":
-        from shadowclash.modes.singleplayer_pole import run_singleplayer
+            run_versus(config)
+        elif mode in ("host", "join"):
+            if mode == "join" and not ip:
+                parser.error("--ip is required for join mode")
+            from shadowclash.modes.multiplayer_match import run_multiplayer
 
-        run_singleplayer(config)
-    elif mode == "versus":
-        from shadowclash.modes.singleplayer_vs import run_versus
+            run_multiplayer(
+                config, host=(mode == "host"), ip=ip, port=port, input_source=args.input
+            )
 
-        run_versus(config)
-    elif mode in ("host", "join"):
-        if mode == "join" and not ip:
-            parser.error("--ip is required for join mode")
-        from shadowclash.modes.multiplayer_match import run_multiplayer
+    try:
+        if args.mode == "menu":
+            # Menu-driven session: modes return here (Esc cancels a room or
+            # fight back to the menu) until the player picks Quit
+            from shadowclash.ui.menu import run_menu
 
-        run_multiplayer(config, host=(mode == "host"), ip=ip, port=port, input_source=args.input)
+            while True:
+                mode, menu_ip = run_menu(config)
+                if mode == "quit":
+                    return
+                run_mode(mode, menu_ip or args.ip)
+        else:
+            run_mode(args.mode, args.ip)
+    finally:
+        import pygame
+
+        pygame.quit()
 
 
 if __name__ == "__main__":

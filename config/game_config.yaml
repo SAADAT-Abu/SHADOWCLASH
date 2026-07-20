@@ -38,6 +38,10 @@ network:
   default_port: 5555
   packet_rate_hz: 30
   peer_timeout_ms: 200
+  # Public rendezvous server for token-based internet play (UDP hole
+  # punching); leave host empty to disable and play LAN-only
+  rendezvous_host: "65.20.110.24"
+  rendezvous_port: 5556
 
 singleplayer:
   pole_hp: 100

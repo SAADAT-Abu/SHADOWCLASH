@@ -25,6 +25,15 @@ def font(size: int) -> pygame.font.Font:
     return _fonts[size]
 
 
+def render_fit(text: str, size: int, color: tuple[int, int, int], max_width: int) -> pygame.Surface:
+    """Render text, stepping the font size down until it fits max_width."""
+    surf = font(size).render(text, True, color)
+    while surf.get_width() > max_width and size > 14:
+        size -= 2
+        surf = font(size).render(text, True, color)
+    return surf
+
+
 def vertical_gradient(
     size: tuple[int, int],
     top: tuple[int, int, int] = BG_TOP,

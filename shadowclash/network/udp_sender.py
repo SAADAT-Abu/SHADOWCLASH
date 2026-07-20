@@ -21,6 +21,9 @@ class UdpSender:
         self.player_id = player_id
         self.target = target
         self.player_name = player_name
+        # Extra hole-punching destinations (peer's other candidate endpoints);
+        # cleared once real game packets arrive and lock in the working path
+        self.punch_targets: list[tuple[str, int]] = []
         self._seq = 0
         self._event_seq = 0
         self._pending_events: list[DamageEvent] = []
@@ -44,7 +47,9 @@ class UdpSender:
             events=list(self._pending_events),
             name=self.player_name,
         )
-        try:
-            self.sock.sendto(protocol.pack(packet), self.target)
-        except OSError:
-            pass
+        payload = protocol.pack(packet)
+        for dest in [self.target, *self.punch_targets]:
+            try:
+                self.sock.sendto(payload, dest)
+            except OSError:
+                pass
