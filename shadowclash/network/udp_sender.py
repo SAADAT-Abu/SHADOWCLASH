@@ -21,6 +21,7 @@ class UdpSender:
         self.player_id = player_id
         self.target = target
         self.player_name = player_name
+        self.rounds = 0  # host sets its best-of-N so the joiner can adopt it
         # Extra hole-punching destinations (peer's other candidate endpoints);
         # cleared once real game packets arrive and lock in the working path
         self.punch_targets: list[tuple[str, int]] = []
@@ -46,6 +47,7 @@ class UdpSender:
             pose=pose,
             events=list(self._pending_events),
             name=self.player_name,
+            rounds=self.rounds,
         )
         payload = protocol.pack(packet)
         for dest in [self.target, *self.punch_targets]:

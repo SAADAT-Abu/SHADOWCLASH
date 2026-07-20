@@ -38,6 +38,13 @@ def test_name_truncated_to_wire_limit():
     assert protocol.unpack(protocol.pack(Packet(0, 1, 0, None, []))).name == ""
 
 
+def test_rounds_roundtrip():
+    out = protocol.unpack(protocol.pack(Packet(0, 1, 0, None, [], rounds=5)))
+    assert out.rounds == 5
+    # Unset rounds stays 0 (joiner falls back to its own config)
+    assert protocol.unpack(protocol.pack(Packet(0, 1, 0, None, []))).rounds == 0
+
+
 def test_rejects_garbage_and_truncated():
     assert protocol.unpack(b"nonsense") is None
     good = protocol.pack(Packet(0, 1, 0, None, [DamageEvent(1, "head", False, 5.0)]))

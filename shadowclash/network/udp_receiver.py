@@ -25,6 +25,7 @@ class UdpReceiver:
         self._new_events: list[DamageEvent] = []
         self.peer_addr: tuple[str, int] | None = None
         self.peer_name: str = ""
+        self.peer_rounds: int = 0  # host's best-of-N, 0 until first packet
         self.last_rx_time: float = 0.0
         # Rendezvous replies (SHRV1 datagrams share the game socket)
         self.rdv_token: str | None = None
@@ -89,6 +90,8 @@ class UdpReceiver:
                 self.peer_addr = addr
                 if packet.name:
                     self.peer_name = packet.name
+                if packet.rounds:
+                    self.peer_rounds = packet.rounds
                 self.last_rx_time = time.monotonic()
                 if packet.seq <= self._last_seq:
                     continue  # stale or duplicate datagram

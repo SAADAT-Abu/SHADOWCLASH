@@ -54,14 +54,21 @@ def main() -> None:
     bell = sum(a * np.sin(2 * np.pi * f * t) for f, a in [(660, 1.0), (1320, 0.6), (1975, 0.35)])
     save("bell.wav", bell * np.exp(-t * 4))
 
-    # KO gong: dense low partials, long decay, soft noise attack
-    t = t_axis(2.4)
+    # KO: deep sub-boom + dense gong partials + hard noise crack, long tail —
+    # unmistakably bigger than any normal hit
+    t = t_axis(3.2)
+    boom = np.sin(2 * np.pi * (52 * (1.0 - 0.35 * t / 3.2)) * t) * np.exp(-t * 2.2) * 1.6
     gong = sum(
         a * np.sin(2 * np.pi * f * t + p)
         for f, a, p in [(140, 1.0, 0.0), (211, 0.7, 1.1), (287, 0.5, 2.3), (395, 0.35, 0.4)]
     )
-    attack = rng.normal(0, 1, len(t)) * np.exp(-t * 40) * 0.4
-    save("ko.wav", (gong + attack) * np.exp(-t * 1.6))
+    attack = rng.normal(0, 1, len(t)) * np.exp(-t * 25) * 0.9
+    save("ko.wav", boom + (gong + attack) * np.exp(-t * 1.3))
+
+    # Countdown beep: short clean blip for the 5..1 pre-round count
+    t = t_axis(0.14)
+    beep = np.sin(2 * np.pi * 880 * t) * np.exp(-t * 22)
+    save("count.wav", beep)
 
 
 if __name__ == "__main__":

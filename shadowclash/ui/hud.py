@@ -61,13 +61,43 @@ class Hud:
             self.screen.blit(surf, (10, y))
             y += 20
 
-    def draw_center_message(self, text: str, sub: str | None = None) -> None:
+    def draw_center_message(
+        self, text: str, sub: str | None = None, color: tuple[int, int, int] = (255, 60, 60)
+    ) -> None:
         from shadowclash.ui.theme import render_fit
 
         w = self.screen.get_width()
         cx, cy = w // 2, self.screen.get_height() // 2
-        surf = render_fit(text, 96, (255, 60, 60), w - 60)
+        surf = render_fit(text, 96, color, w - 60)
         self.screen.blit(surf, surf.get_rect(center=(cx, cy)))
         if sub:
             sub_surf = render_fit(sub, 28, (255, 255, 255), w - 60)
             self.screen.blit(sub_surf, sub_surf.get_rect(center=(cx, cy + 70)))
+
+    def draw_round_pips(self, wins: int, needed: int, right: bool = False) -> None:
+        """Tekken-style round markers under a health bar: one pip per round
+        needed to take the match, filled as rounds are won."""
+        margin, bar_h, r, gap = 30, 26, 7, 22
+        y = margin + bar_h + 36
+        for i in range(needed):
+            x = (
+                self.screen.get_width() - margin - r - i * gap
+                if right
+                else margin + r + i * gap
+            )
+            if i < wins:
+                pygame.draw.circle(self.screen, (255, 214, 90), (x, y), r)
+            pygame.draw.circle(self.screen, (255, 255, 255), (x, y), r, 2)
+
+    def draw_countdown(self, title: str, seconds: int, sub: str | None = None) -> None:
+        from shadowclash.ui.theme import render_fit
+
+        w = self.screen.get_width()
+        cx, cy = w // 2, self.screen.get_height() // 2
+        title_surf = render_fit(title, 72, (255, 214, 90), w - 60)
+        self.screen.blit(title_surf, title_surf.get_rect(center=(cx, cy - 90)))
+        num_surf = render_fit(str(seconds), 140, (255, 255, 255), w - 60)
+        self.screen.blit(num_surf, num_surf.get_rect(center=(cx, cy + 10)))
+        if sub:
+            sub_surf = render_fit(sub, 28, (255, 255, 255), w - 60)
+            self.screen.blit(sub_surf, sub_surf.get_rect(center=(cx, cy + 110)))

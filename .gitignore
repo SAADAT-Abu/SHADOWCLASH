@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+SaadatAbu_CV.pdf
+Screenshots/
+*.pdf

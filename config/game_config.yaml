@@ -29,10 +29,16 @@ damage:
   torso: 8
   leg: 4
   block_reduction: 0.7
+  # VS mode multiplier on every hit so multiplayer fights last longer
+  vs_scale: 0.6
 
 match:
   starting_hp: 100
   round_time_seconds: 99
+  # VS mode: best-of-N rounds (host's settings panel offers 3/5/7)
+  vs_rounds: 3
+  # Countdown before round 1 (after the peer connects) and between rounds
+  round_gap_seconds: 30
 
 network:
   default_port: 5555

@@ -39,6 +39,8 @@ class DamageSystem:
         self.max_multiplier = phys["max_damage_multiplier"]
         self.starting_hp = config["match"]["starting_hp"]
         self.hp = {f: float(self.starting_hp) for f in fighters}
+        # Mode-level damage multiplier (VS mode softens hits so fights last)
+        self.scale = 1.0
 
     def apply_hit(
         self, attacker: str, defender: str, zone: str, velocity: float, blocked: bool = False
@@ -50,7 +52,7 @@ class DamageSystem:
             self.max_multiplier,
             blocked,
             self.block_reduction,
-        )
+        ) * self.scale
         self.apply_damage(defender, damage)
         return HitResult(attacker, defender, zone, damage, blocked, self.is_ko(defender))
 

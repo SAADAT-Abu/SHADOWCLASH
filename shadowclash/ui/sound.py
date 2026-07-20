@@ -23,7 +23,7 @@ class SoundBank:
         except pygame.error as exc:
             log.warning("Audio unavailable (%s) — running silent", exc)
             return
-        for name in ("hit_light", "hit_heavy", "block", "bell", "ko"):
+        for name in ("hit_light", "hit_heavy", "block", "bell", "ko", "count"):
             path = SOUNDS_DIR / f"{name}.wav"
             if path.exists():
                 self._sounds[name] = pygame.mixer.Sound(str(path))
@@ -48,3 +48,6 @@ class SoundBank:
 
     def ko(self) -> None:
         self._play("ko")
+
+    def count(self) -> None:
+        self._play("count")

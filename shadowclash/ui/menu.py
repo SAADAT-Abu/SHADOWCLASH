@@ -22,35 +22,45 @@ VS_ITEMS = [
     ("Back", "back"),
 ]
 
-# (label, options shown, writer applying the chosen option index to config)
+# (label, options shown, writer applying the chosen option index to config,
+#  reader returning the current option index from config)
 SETTING_ROWS = [
     (
         "Hand tracking (fingers)",
         ["Off: stylized hands, fastest", "On: real finger tracking"],
         lambda config, i: config["pose"].__setitem__("hand_tracking", bool(i)),
+        lambda config: 1 if config["pose"].get("hand_tracking") else 0,
     ),
     (
         "Tracking model",
         ["Fast", "Balanced", "Accurate"],
         lambda config, i: config["pose"].__setitem__("model_complexity", i),
+        lambda config: min(config["pose"].get("model_complexity", 0), 2),
     ),
     (
         "Camera FPS",
         ["15", "30", "60"],
         lambda config, i: config["camera"].__setitem__("fps", [15, 30, 60][i]),
+        lambda config: {15: 0, 30: 1, 60: 2}.get(config["camera"].get("fps", 30), 1),
     ),
 ]
 
+# Extra row for the VS Mode host: how many rounds the match runs (best of N)
+ROUNDS_ROW = (
+    "Rounds (best of)",
+    ["3", "5", "7"],
+    lambda config, i: config["match"].__setitem__("vs_rounds", [3, 5, 7][i]),
+    lambda config: {3: 0, 5: 1, 7: 2}.get(config["match"].get("vs_rounds", 3), 0),
+)
 
-def _current_setting_values(config: dict) -> list[int]:
-    return [
-        1 if config["pose"].get("hand_tracking") else 0,
-        min(config["pose"].get("model_complexity", 0), 2),
-        {15: 0, 30: 1, 60: 2}.get(config["camera"].get("fps", 30), 1),
-    ]
 
-
-def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, subtitle: str) -> bool:
+def run_settings_panel(
+    screen: pygame.Surface,
+    config: dict,
+    mode_label: str,
+    subtitle: str,
+    rows: list | None = None,
+) -> bool:
     """Match creator's settings panel + START button.
 
     The game title stays SHADOWCLASH; `mode_label` names the mode beneath it.
@@ -62,9 +72,10 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
     backdrop = FightScene(screen.get_size())
     small = theme.font(30)
 
-    values = _current_setting_values(config)
-    selected = 0  # 0..len(SETTING_ROWS)-1 = rows, len(SETTING_ROWS) = START
-    start_row = len(SETTING_ROWS)
+    rows = SETTING_ROWS if rows is None else rows
+    values = [read(config) for _, _, _, read in rows]
+    selected = 0  # 0..len(rows)-1 = rows, len(rows) = START
+    start_row = len(rows)
     cx = screen.get_width() // 2
     rows_top = 260
     row_h = 64
@@ -75,10 +86,10 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
         return pygame.Rect(cx - half + 30, rows_top + i * row_h - 8, half * 2 - 60, row_h - 12)
 
     def cycle(i: int, direction: int) -> None:
-        values[i] = (values[i] + direction) % len(SETTING_ROWS[i][1])
+        values[i] = (values[i] + direction) % len(rows[i][1])
 
     def apply_and_start() -> bool:
-        for (label, options, write), value in zip(SETTING_ROWS, values):
+        for (label, options, write, _read), value in zip(rows, values):
             write(config, value)
         return True
 
@@ -117,12 +128,12 @@ def run_settings_panel(screen: pygame.Surface, config: dict, mode_label: str, su
         backdrop.draw_background(screen)
         theme.draw_title(screen, "SHADOWCLASH", subtitle)
         half = min(450, screen.get_width() // 2 - 20)
-        panel = pygame.Rect(cx - half, rows_top - 60, half * 2, len(SETTING_ROWS) * row_h + 70)
+        panel = pygame.Rect(cx - half, rows_top - 60, half * 2, len(rows) * row_h + 70)
         theme.draw_panel(screen, panel)
         head = small.render(f"{mode_label} SETTINGS", True, theme.HIGHLIGHT)
         screen.blit(head, head.get_rect(midtop=(cx, rows_top - 46)))
 
-        for i, (label, options, _) in enumerate(SETTING_ROWS):
+        for i, (label, options, _write, _read) in enumerate(rows):
             rect = row_rect(i)
             if rect.collidepoint(mouse):
                 selected = i
