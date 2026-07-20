@@ -41,8 +41,8 @@ From: ubuntu:22.04
     echo "=================================================="
     echo "   SHADOWCLASH — Full-Body Mirror Fight Arena"
     echo "=================================================="
-    echo "Ensure --bind /dev/video0 and X11 (--bind /tmp/.X11-unix)"
-    echo "were passed to 'singularity run' for camera + display."
+    echo "If the camera or window fails to open, see:"
+    echo "  singularity run-help shadowclash.sif"
     echo "=================================================="
     cd /opt/shadowclash
     exec python3.11 -m shadowclash.main "$@"
@@ -50,13 +50,24 @@ From: ubuntu:22.04
 %help
     SHADOWCLASH: motion-mirrored 2-player fighting game.
 
-    Run with webcam + display passthrough:
+    Portable launch (any Linux PC with a webcam and desktop session):
 
       singularity run \
-        --bind /dev/video0:/dev/video0 \
-        --bind /tmp/.X11-unix:/tmp/.X11-unix \
+        --bind /tmp/.X11-unix \
+        --bind /run/user/$(id -u) \
         --env DISPLAY=$DISPLAY \
+        --env XAUTHORITY=$XAUTHORITY \
         shadowclash.sif
+
+    Notes:
+      - Do NOT bind /dev/video0 explicitly. Singularity mounts the host /dev
+        by default, and a single-file device bind breaks camera access.
+      - The /run/user bind supplies the X11 auth cookie (Wayland/XWayland
+        desktops) and the PulseAudio/PipeWire socket for sound.
+      - On plain X11 setups where XAUTHORITY is unset, drop that --env and
+        run "xhost +local:" once before launching.
+      - If your webcam is not device 0, copy config/game_config.yaml out of
+        the repo, set camera.index, and pass --config <path>.
 
     Single-player training mode (kicking pole):
       singularity run shadowclash.sif --mode singleplayer
@@ -64,5 +75,6 @@ From: ubuntu:22.04
     Multiplayer host:
       singularity run shadowclash.sif --mode host --port 5555
 
-    Multiplayer join:
+    Multiplayer join (LAN IP or internet room token):
       singularity run shadowclash.sif --mode join --ip 192.168.1.42 --port 5555
+      singularity run shadowclash.sif --mode join --ip A7K2QF

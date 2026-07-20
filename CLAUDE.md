@@ -278,8 +278,8 @@ From: ubuntu:22.04
     echo "=================================================="
     echo "   SHADOWCLASH — Full-Body Mirror Fight Arena"
     echo "=================================================="
-    echo "Ensure --bind /dev/video0 and X11 (--bind /tmp/.X11-unix)"
-    echo "were passed to 'singularity run' for camera + display."
+    echo "If the camera or window fails to open, see:"
+    echo "  singularity run-help shadowclash.sif"
     echo "=================================================="
     cd /opt/shadowclash
     exec python3.11 -m shadowclash.main "$@"
@@ -287,13 +287,16 @@ From: ubuntu:22.04
 %help
     SHADOWCLASH: motion-mirrored 2-player fighting game.
 
-    Run with webcam + display passthrough:
+    Portable launch (any Linux PC with a webcam and desktop session):
 
       singularity run \
-        --bind /dev/video0:/dev/video0 \
-        --bind /tmp/.X11-unix:/tmp/.X11-unix \
+        --bind /tmp/.X11-unix \
+        --bind /run/user/$(id -u) \
         --env DISPLAY=$DISPLAY \
+        --env XAUTHORITY=$XAUTHORITY \
         shadowclash.sif
+
+    (Do NOT bind /dev/video0 — see D-017 and section 6.3 notes.)
 
     Single-player training mode (kicking pole):
       singularity run shadowclash.sif --mode singleplayer
@@ -301,8 +304,9 @@ From: ubuntu:22.04
     Multiplayer host:
       singularity run shadowclash.sif --mode host --port 5555
 
-    Multiplayer join:
+    Multiplayer join (LAN IP or internet room token):
       singularity run shadowclash.sif --mode join --ip 192.168.1.42 --port 5555
+      singularity run shadowclash.sif --mode join --ip A7K2QF
 ```
 
 ### 6.2 Build the container (`scripts/build_container.sh`)
@@ -318,36 +322,40 @@ echo "Share this single file — recipients only need Singularity/Apptainer inst
 
 ### 6.3 Running the container
 
-**Single-player (kicking pole) — recommended first run to test setup:**
+Easiest: use the portable launcher, which auto-detects display/audio passthrough
+on any Linux desktop (X11 or Wayland, PulseAudio or PipeWire):
+
 ```bash
-singularity run \
-  --bind /dev/video0:/dev/video0 \
-  --bind /tmp/.X11-unix:/tmp/.X11-unix \
-  --env DISPLAY=$DISPLAY \
-  shadowclash.sif --mode singleplayer
+./scripts/run_container.sh                              # menu
+./scripts/run_container.sh --mode singleplayer          # training pole
+./scripts/run_container.sh --mode host --port 5555
+./scripts/run_container.sh --mode join --ip <HOST_IP or room token>
 ```
 
-**Multiplayer — Player A (host):**
-```bash
-singularity run \
-  --bind /dev/video0:/dev/video0 \
-  --bind /tmp/.X11-unix:/tmp/.X11-unix \
-  --env DISPLAY=$DISPLAY \
-  shadowclash.sif --mode host --port 5555
-```
+Equivalent manual command (D-017):
 
-**Multiplayer — Player B (join):**
 ```bash
 singularity run \
-  --bind /dev/video0:/dev/video0 \
-  --bind /tmp/.X11-unix:/tmp/.X11-unix \
+  --bind /tmp/.X11-unix \
+  --bind /run/user/$(id -u) \
   --env DISPLAY=$DISPLAY \
-  shadowclash.sif --mode join --ip <HOST_IP> --port 5555
+  --env XAUTHORITY=$XAUTHORITY \
+  shadowclash.sif [--mode ...]
 ```
 
 **Notes for Linux hosts:**
-- Run `xhost +local:` on the host before launching, to allow the container to access the X11 display
-- Webcam device path may differ (`/dev/video1`, etc.) — check with `v4l2-ctl --list-devices`
+- Do **not** pass `--bind /dev/video0` — Singularity mounts the host `/dev` by default, and a single-file device bind breaks camera access with EACCES (D-017)
+- The `/run/user/$(id -u)` bind supplies the X11 auth cookie (Wayland/XWayland desktops) and the Pulse/PipeWire socket; on plain X11 hosts without `XAUTHORITY`, drop that `--env` and run `xhost +local:` once instead
+- If the webcam is not device index 0 (check `v4l2-ctl --list-devices`), copy `config/game_config.yaml`, set `camera.index`, and pass `--config <path>`
+
+### 6.4 Windows / macOS builds (D-018)
+
+The `.sif` is Linux-only. For Windows and Mac, `shadowclash.spec` +
+`.github/workflows/build-desktop.yml` build standalone PyInstaller bundles
+(windows-x64, macos-arm64, macos-intel, linux-x64). Push the repo to GitHub and
+trigger the workflow manually, or push a `v*` tag to get zips attached to a
+release. Local Linux check of the same spec: `pyinstaller shadowclash.spec`
+then `./dist/shadowclash/shadowclash`.
 - On systems without a physical X server (e.g., pure headless servers), this game cannot run — it requires a local display for the Pygame window; this is a LAN party / same-room game by design, not a cloud/remote-desktop game
 
 ---
