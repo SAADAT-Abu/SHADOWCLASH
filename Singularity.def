@@ -1,0 +1,68 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Author AbuSaadat
+    Game SHADOWCLASH
+    Version 1.0
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    # Ubuntu 22.04 ships python3.10 only; python3.11 comes from deadsnakes
+    # (see DECISIONS.md D-002)
+    apt-get update && apt-get install -y software-properties-common
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update && apt-get install -y \
+        python3.11 python3.11-venv python3.11-dev python3.11-distutils \
+        libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
+        libx11-6 libxcb1 libxau6 libxdmcp6 \
+        libasound2 libpulse0 \
+        v4l-utils \
+        ffmpeg \
+        curl \
+        && rm -rf /var/lib/apt/lists/*
+
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+    python3.11 -m pip install --upgrade pip setuptools wheel
+    python3.11 -m pip install --no-cache-dir -r /opt/shadowclash/requirements.txt
+
+%files
+    ./shadowclash /opt/shadowclash/shadowclash
+    ./config /opt/shadowclash/config
+    ./assets /opt/shadowclash/assets
+    ./requirements.txt /opt/shadowclash/requirements.txt
+
+%environment
+    export PYTHONPATH=/opt/shadowclash:$PYTHONPATH
+    export SDL_AUDIODRIVER=pulse
+
+%runscript
+    echo "=================================================="
+    echo "   SHADOWCLASH — Full-Body Mirror Fight Arena"
+    echo "=================================================="
+    echo "Ensure --bind /dev/video0 and X11 (--bind /tmp/.X11-unix)"
+    echo "were passed to 'singularity run' for camera + display."
+    echo "=================================================="
+    cd /opt/shadowclash
+    exec python3.11 -m shadowclash.main "$@"
+
+%help
+    SHADOWCLASH: motion-mirrored 2-player fighting game.
+
+    Run with webcam + display passthrough:
+
+      singularity run \
+        --bind /dev/video0:/dev/video0 \
+        --bind /tmp/.X11-unix:/tmp/.X11-unix \
+        --env DISPLAY=$DISPLAY \
+        shadowclash.sif
+
+    Single-player training mode (kicking pole):
+      singularity run shadowclash.sif --mode singleplayer
+
+    Multiplayer host:
+      singularity run shadowclash.sif --mode host --port 5555
+
+    Multiplayer join:
+      singularity run shadowclash.sif --mode join --ip 192.168.1.42 --port 5555

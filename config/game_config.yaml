@@ -1,0 +1,49 @@
+camera:
+  index: 0
+  width: 640
+  height: 480
+  fps: 30
+
+pose:
+  min_detection_confidence: 0.6
+  min_tracking_confidence: 0.6
+  # true = Holistic with real finger tracking (slower); false = pose-only
+  # with stylized hands (faster). Match creator can change in settings panel.
+  hand_tracking: false
+  # 0 = fastest, 1 = balanced, 2 = most accurate
+  model_complexity: 0
+  # higher alpha = snappier but jitterier; lower = smoother but laggier
+  smoothing_alpha: 0.5
+  min_joint_visibility: 0.5
+
+physics:
+  # Strike velocity is measured in torso-lengths per second (D-005),
+  # framing-invariant. Tune during M4.
+  min_strike_velocity: 3.0
+  reference_velocity: 6.0
+  max_damage_multiplier: 1.5
+  hit_cooldown_ms: 600
+
+damage:
+  head: 15
+  torso: 8
+  leg: 4
+  block_reduction: 0.7
+
+match:
+  starting_hp: 100
+  round_time_seconds: 99
+
+network:
+  default_port: 5555
+  packet_rate_hz: 30
+  peer_timeout_ms: 200
+
+singleplayer:
+  pole_hp: 100
+  pole_regen_per_sec: 2
+
+display:
+  width: 1280
+  height: 720
+  fps: 60
