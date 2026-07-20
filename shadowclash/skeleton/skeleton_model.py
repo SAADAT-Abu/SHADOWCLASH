@@ -160,11 +160,30 @@ def leg_radius(xy: np.ndarray) -> float:
     return torso_length(xy) * 0.10
 
 
-def is_blocking(xy: np.ndarray, strike_pos: np.ndarray) -> bool:
-    """Block check: a forearm (wrist) raised above shoulder height and
-    horizontally between the incoming strike and the defender's torso center.
-    Note y is down, so "above" means smaller y.
+def is_guarding(xy: np.ndarray) -> bool:
+    """Tekken-style guard: both hands joined in front of the upper body.
+
+    Wrists must be close together (within ~a third of a torso length) and
+    their midpoint held above hip height, near the body's center line.
     """
+    torso = torso_length(xy)
+    wrist_gap = np.linalg.norm(xy[LEFT_WRIST] - xy[RIGHT_WRIST])
+    if wrist_gap > 0.35 * torso:
+        return False
+    mid = (xy[LEFT_WRIST] + xy[RIGHT_WRIST]) / 2.0
+    hip_y = (xy[LEFT_HIP, 1] + xy[RIGHT_HIP, 1]) / 2.0
+    torso_cx = (xy[LEFT_SHOULDER, 0] + xy[RIGHT_SHOULDER, 0] + xy[LEFT_HIP, 0] + xy[RIGHT_HIP, 0]) / 4.0
+    return mid[1] < hip_y and abs(mid[0] - torso_cx) < 0.7 * torso
+
+
+def is_blocking(xy: np.ndarray, strike_pos: np.ndarray) -> bool:
+    """Block check: joined-hands guard (is_guarding), or a forearm (wrist)
+    raised above shoulder height and horizontally between the incoming
+    strike and the defender's torso center. Note y is down, so "above"
+    means smaller y.
+    """
+    if is_guarding(xy):
+        return True
     torso_cx = (xy[LEFT_SHOULDER, 0] + xy[RIGHT_SHOULDER, 0] + xy[LEFT_HIP, 0] + xy[RIGHT_HIP, 0]) / 4.0
     shoulder_y = min(xy[LEFT_SHOULDER, 1], xy[RIGHT_SHOULDER, 1])
     margin = torso_length(xy) * 0.15

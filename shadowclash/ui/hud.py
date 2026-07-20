@@ -44,6 +44,16 @@ class Hud:
             surf = self.font.render(label, True, color)
             self.screen.blit(surf, (x, y - int(age * 50)))
 
+    def draw_level_banner(self, text: str) -> None:
+        surf = self.font.render(text, True, (255, 214, 90))
+        self.screen.blit(surf, surf.get_rect(midtop=(self.screen.get_width() // 2, 92)))
+
+    def draw_distance_hint(self, text: str) -> None:
+        surf = self.font.render(text, True, (120, 200, 255))
+        pos = surf.get_rect(midbottom=(self.screen.get_width() // 2, int(self.screen.get_height() * 0.97)))
+        pygame.draw.rect(self.screen, (20, 18, 30), pos.inflate(24, 10), border_radius=8)
+        self.screen.blit(surf, pos)
+
     def draw_debug(self, lines: list[str]) -> None:
         y = self.screen.get_height() - 20 * len(lines) - 10
         for line in lines:

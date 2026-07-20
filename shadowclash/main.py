@@ -12,13 +12,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="shadowclash", description="Full-Body Mirror Fight Arena")
     parser.add_argument(
         "--mode",
-        choices=["menu", "posecheck", "singleplayer", "host", "join"],
+        choices=["menu", "posecheck", "singleplayer", "versus", "host", "join"],
         default="menu",
-        help="menu (default), posecheck (M1 camera sanity check), singleplayer, host, join",
+        help="menu (default), posecheck (M1 camera sanity check), singleplayer "
+        "(pole training), versus (fight the shadow bot), host, join",
     )
     parser.add_argument("--ip", help="host IP for join mode")
     parser.add_argument("--port", type=int, help="UDP port (default from config)")
     parser.add_argument("--config", help="path to game_config.yaml")
+    parser.add_argument(
+        "--input",
+        choices=["camera", "bot"],
+        default="camera",
+        help="bot substitutes a synthetic fighter for the webcam (multiplayer testing)",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -41,12 +48,16 @@ def main() -> None:
         from shadowclash.modes.singleplayer_pole import run_singleplayer
 
         run_singleplayer(config)
+    elif mode == "versus":
+        from shadowclash.modes.singleplayer_vs import run_versus
+
+        run_versus(config)
     elif mode in ("host", "join"):
         if mode == "join" and not ip:
             parser.error("--ip is required for join mode")
         from shadowclash.modes.multiplayer_match import run_multiplayer
 
-        run_multiplayer(config, host=(mode == "host"), ip=ip, port=port)
+        run_multiplayer(config, host=(mode == "host"), ip=ip, port=port, input_source=args.input)
 
 
 if __name__ == "__main__":

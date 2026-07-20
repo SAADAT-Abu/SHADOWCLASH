@@ -15,13 +15,13 @@ from shadowclash.physics.hitbox_manager import FighterHitboxes, PoleHitboxes
 from shadowclash.skeleton import skeleton_model as sm
 from shadowclash.skeleton.skeleton_renderer import draw_pole, draw_skeleton
 from shadowclash.ui.hud import Hud
+from shadowclash.ui.scene import FightScene
+from shadowclash.ui.sound import SoundBank
 from shadowclash.utils.logger import get_logger
 
 log = get_logger(__name__)
 
 PLAYER_COLOR = (70, 160, 255)
-BG_COLOR = (18, 18, 24)
-FLOOR_COLOR = (40, 40, 52)
 
 
 def run_singleplayer(config: dict) -> None:
@@ -53,8 +53,10 @@ def run_singleplayer(config: dict) -> None:
     player = FighterHitboxes(engine.space, "A")
     PoleHitboxes(engine.space, "B")
     hud = Hud(screen)
+    scene = FightScene(arena.size)
+    sounds = SoundBank()
 
-    show_debug = True
+    show_debug = False
     last_hit_time = 0.0
     running = True
     log.info("Pole mode started — Esc quits, D toggles debug overlay")
@@ -82,25 +84,25 @@ def run_singleplayer(config: dict) -> None:
         for hit in hits:
             last_hit_time = now_ms
             zone_x, zone_y, _ = PoleHitboxes.ZONES[hit.zone]
-            hud.add_hit_popup(
-                hit.zone,
-                hit.damage,
-                hit.blocked,
-                (int(zone_x * arena.width) - 40, int(zone_y * arena.height)),
-            )
+            pos = (int(zone_x * arena.width) - 40, int(zone_y * arena.height))
+            hud.add_hit_popup(hit.zone, hit.damage, hit.blocked, pos)
+            scene.add_hit_spark(pos, heavy=hit.zone == "head")
+            sounds.hit(hit.zone, hit.damage, hit.blocked)
 
         if damage.is_ko("B"):
             damage.reset("B")  # pole resets after "defeat" so training continues
         elif now_ms - last_hit_time > 1500:
             damage.heal("B", regen * dt)
 
-        screen.fill(BG_COLOR)
-        pygame.draw.rect(screen, FLOOR_COLOR, (0, int(arena.height * 0.92), arena.width, arena.height))
+        scene.draw_background(screen)
         draw_pole(screen, PoleHitboxes.ZONES, damage.hp["B"] / pole_hp_max, arena)
         if pose is not None:
-            draw_skeleton(screen, sm.to_arena(pose), PLAYER_COLOR, arena, visibility=pose[:, 3])
+            xy = sm.to_arena(pose)
+            scene.draw_fighter_shadow(screen, xy, arena)
+            draw_skeleton(screen, xy, PLAYER_COLOR, arena, visibility=pose[:, 3])
         else:
             hud.draw_center_message("NO POSE", "step into the camera view")
+        scene.update_and_draw_particles(screen, dt)
 
         hud.draw_health_bar("POLE", damage.hp["B"], pole_hp_max, right=True)
         hud.draw_popups()
