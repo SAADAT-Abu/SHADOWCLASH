@@ -22,8 +22,9 @@ jobs:
             label: windows-x64
           - os: macos-latest
             label: macos-arm64
-          - os: macos-13
-            label: macos-intel
+          # No macos-intel target: GitHub retired Intel Mac runners, and
+          # PyInstaller cannot cross-build x86_64 from arm64. Intel Mac
+          # users run from source (see README).
           - os: ubuntu-22.04
             label: linux-x64
     runs-on: ${{ matrix.os }}

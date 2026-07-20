@@ -36,10 +36,9 @@ Tekken guard) to block. Stand back so your whole body is in the camera frame.
 
 ### macOS
 
-1. Download from the
-   [latest release](https://github.com/SAADAT-Abu/SHADOWCLASH/releases/latest):
-   `shadowclash-macos-arm64.zip` for Apple Silicon (M1 or newer) or
-   `shadowclash-macos-intel.zip` for Intel Macs.
+1. Download `shadowclash-macos-arm64.zip` (Apple Silicon, M1 or newer) from the
+   [latest release](https://github.com/SAADAT-Abu/SHADOWCLASH/releases/latest).
+   Intel Macs: use "Running from source" below instead.
 2. Extract the zip, then open Terminal in the extracted folder and run:
 
    ```bash
