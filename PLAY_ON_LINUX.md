@@ -31,7 +31,7 @@ against AI villains, a training pole, or another player over LAN or internet.
 wget -O shadowclash.sif "https://zenodo.org/records/21461081/files/shadowclash.sif?download=1"
 ```
 
-Optional integrity check, the output should be `59f0315102cf3654e1231ff944eb61bc`:
+Optional integrity check, the output should be `af087a9423fee8bdea3e4a28f61a453f`:
 
 ```bash
 md5sum shadowclash.sif
