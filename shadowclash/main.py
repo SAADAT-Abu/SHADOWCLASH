@@ -17,7 +17,10 @@ def main() -> None:
         help="menu (default), posecheck (M1 camera sanity check), singleplayer "
         "(pole training), versus (fight the shadow bot), host, join",
     )
-    parser.add_argument("--ip", help="join target: host IP (LAN) or room token (internet)")
+    parser.add_argument(
+        "--ip",
+        help="join target: room token, or a host IP for offline LAN play",
+    )
     parser.add_argument("--port", type=int, help="UDP port (default from config)")
     parser.add_argument("--config", help="path to game_config.yaml")
     parser.add_argument(

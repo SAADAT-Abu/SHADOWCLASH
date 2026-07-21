@@ -52,6 +52,8 @@ class RendezvousClient:
         self._mode: str | None = None
         self._join_token = ""
         self._last_send = 0.0
+        self._last_relay = 0.0
+        self.relaying = False
         self._local = f"{local_ip()}:{sock.getsockname()[1]}"
 
     def start_host(self) -> None:
@@ -61,9 +63,18 @@ class RendezvousClient:
         self._mode = "join"
         self._join_token = token.strip().upper()
 
+    def start_relay(self) -> None:
+        """Give up on a direct path and route game packets via the server."""
+        self.relaying = True
+
     @property
     def token(self) -> str | None:
         return self.receiver.rdv_token
+
+    @property
+    def relay_token(self) -> str | None:
+        """The room token this side knows: issued to us, or typed in."""
+        return self.token if self._mode == "host" else (self._join_token or None)
 
     @property
     def peers(self) -> list[tuple[str, int]]:
@@ -86,9 +97,18 @@ class RendezvousClient:
 
     def update(self, now: float | None = None) -> None:
         """Call every frame; sends at most one datagram per interval."""
-        if self._mode is None or self.peers:
+        if self._mode is None:
             return
         now = time.monotonic() if now is None else now
+        # Relay keepalives run for the whole match, not just while connecting:
+        # they hold the room, the relay pair and our NAT mapping open.
+        if self.relaying:
+            token = self.relay_token
+            if token and now - self._last_relay >= 2.0:
+                self._send(f"RLY {token} {self._mode} {self._local}")
+                self._last_relay = now
+        if self.peers:
+            return
         if self._mode == "host":
             if self.token is None:
                 if now - self._last_send >= 1.0:

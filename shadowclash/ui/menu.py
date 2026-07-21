@@ -1,10 +1,16 @@
-"""Main menu: mode select with a VS Mode (Host/Join) submenu, IP entry,
-the pre-fight start screen, and the match creator's settings panel.
-All screens draw over the fight-scene backdrop for a consistent look."""
+"""Main menu: mode select with a VS Mode (Host/Join) submenu, room-token
+entry, the pre-fight start screen, and the match creator's settings panel.
+All screens draw over the fight-scene backdrop for a consistent look.
+
+Joining is token-only here (D-020): the token path covers LAN and internet
+alike, and connects directly when it can. Joining a raw IP is still possible
+via `--ip` for offline LAN parties and loopback testing.
+"""
 
 import pygame
 
 from shadowclash.capture.synthetic_pose import SyntheticPoseDriver
+from shadowclash.network.rendezvous_server import TOKEN_LEN
 from shadowclash.skeleton import skeleton_model as sm
 from shadowclash.skeleton.skeleton_renderer import draw_skeleton
 from shadowclash.ui import theme
@@ -269,8 +275,8 @@ def run_menu(config: dict) -> tuple[str, str | None]:
 
     items = MAIN_ITEMS
     selected = 0
-    entering_ip = False
-    ip_text = ""
+    entering_token = False
+    token_text = ""
 
     def panel_rect() -> pygame.Rect:
         rect = pygame.Rect(0, 0, 560, len(items) * 70 + 50)
@@ -282,7 +288,7 @@ def run_menu(config: dict) -> tuple[str, str | None]:
         return pygame.Rect(panel.x + 20, panel.y + 22 + i * 70, panel.width - 40, 58)
 
     def activate(i: int) -> tuple[str, str | None] | None:
-        nonlocal entering_ip, items, selected
+        nonlocal entering_token, items, selected
         mode = items[i][1]
         if mode == "vs":
             items = VS_ITEMS
@@ -293,7 +299,7 @@ def run_menu(config: dict) -> tuple[str, str | None]:
             selected = 0
             return None
         if mode == "join":
-            entering_ip = True
+            entering_token = True
             return None
         return mode, None
 
@@ -304,18 +310,18 @@ def run_menu(config: dict) -> tuple[str, str | None]:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "quit", None
-            if entering_ip:
+            if entering_token:
                 if event.type != pygame.KEYDOWN:
                     continue
-                if event.key == pygame.K_RETURN and ip_text:
-                    return "join", ip_text
+                if event.key == pygame.K_RETURN and token_text:
+                    return "join", token_text
                 elif event.key == pygame.K_ESCAPE:
-                    entering_ip = False
-                    ip_text = ""
+                    entering_token = False
+                    token_text = ""
                 elif event.key == pygame.K_BACKSPACE:
-                    ip_text = ip_text[:-1]
-                elif event.unicode and (event.unicode.isalnum() or event.unicode == "."):
-                    ip_text += event.unicode
+                    token_text = token_text[:-1]
+                elif event.unicode.isalnum() and len(token_text) < TOKEN_LEN:
+                    token_text += event.unicode.upper()
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     if items is VS_ITEMS:
@@ -357,19 +363,19 @@ def run_menu(config: dict) -> tuple[str, str | None]:
             screen, "SHADOWCLASH", "Your body is the controller. Your shadow is your fighter."
         )
 
-        if entering_ip:
-            ip_panel = pygame.Rect(0, 0, min(820, screen.get_width() - 60), 150)
-            ip_panel.center = screen.get_rect().center
-            theme.draw_panel(screen, ip_panel)
+        if entering_token:
+            token_panel = pygame.Rect(0, 0, min(820, screen.get_width() - 60), 150)
+            token_panel.center = screen.get_rect().center
+            theme.draw_panel(screen, token_panel)
             prompt = theme.render_fit(
-                "Host IP or token: " + ip_text + "_", 48, theme.TEXT, ip_panel.width - 40
+                "Room token: " + token_text + "_", 48, theme.TEXT, token_panel.width - 40
             )
-            screen.blit(prompt, prompt.get_rect(center=(ip_panel.centerx, ip_panel.centery - 20)))
+            screen.blit(prompt, prompt.get_rect(center=(token_panel.centerx, token_panel.centery - 20)))
             hint = theme.render_fit(
-                "LAN address (192.168.x.x) or the host's room token, Enter to connect",
-                30, theme.TEXT_DIM, ip_panel.width - 40,
+                f"the {TOKEN_LEN}-letter code from the host's screen, Enter to connect",
+                30, theme.TEXT_DIM, token_panel.width - 40,
             )
-            screen.blit(hint, hint.get_rect(midtop=(ip_panel.centerx, ip_panel.centery + 20)))
+            screen.blit(hint, hint.get_rect(midtop=(token_panel.centerx, token_panel.centery + 20)))
         else:
             theme.draw_panel(screen, panel_rect())
             if items is VS_ITEMS:

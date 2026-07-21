@@ -1,8 +1,10 @@
 """Two-player match: local pose vs peer pose streamed over UDP.
 
-Works on LAN (join by IP) or across the internet (join by room token via the
-rendezvous server + UDP hole punching, DECISIONS.md D-016). The join input
-is auto-detected: dotted-quad means IP, anything else is a token.
+Joining is normally by room token (DECISIONS.md D-016): the rendezvous server
+introduces the peers, they punch directly, and if that fails within a few
+seconds the same server relays the packets instead (D-020). A raw IP is still
+accepted via `--ip` for offline LAN parties and loopback tests; the join input
+is auto-detected, dotted-quad means IP and anything else is a token.
 
 Damage authority (DECISIONS.md D-004): this client computes only the damage
 its LOCAL player deals, applies it locally, and broadcasts it as damage
@@ -156,6 +158,9 @@ def run_multiplayer(
     last_send = 0.0
     ko_message: str | None = None
     token_logged = False
+    peer_locked = False
+    punch_started = 0.0
+    relay_after = net_cfg.get("relay_after_seconds", 6)
     running = True
 
     while running:
@@ -178,17 +183,33 @@ def run_multiplayer(
                 token_logged = True
                 log.info("Room token: %s", rdv.token)
 
-        # Lock onto the address real game packets arrive from; until then,
-        # punch toward every candidate endpoint the rendezvous supplied
-        if receiver.peer_addr is not None:
-            if sender.target != receiver.peer_addr:
-                sender.target = receiver.peer_addr
-                sender.punch_targets = []
-                log.info("Peer connected from %s", receiver.peer_addr)
-        elif rdv is not None and rdv.peers and sender.target is None:
+        # Lock onto the address real game packets arrive from, once and for
+        # good, so a late straggler on the losing path cannot flip us back
+        if receiver.peer_addr is not None and not peer_locked:
+            peer_locked = True
+            sender.target = receiver.peer_addr
+            sender.punch_targets = []
+            via = "relay" if receiver.peer_addr == rdv_server else "direct"
+            log.info("Peer connected from %s (%s)", receiver.peer_addr, via)
+        elif not peer_locked and rdv is not None and rdv.peers and sender.target is None:
             sender.target = rdv.peers[0]
             sender.punch_targets = list(rdv.peers[1:])
+            punch_started = now
             log.info("Hole punching toward %s", rdv.peers)
+
+        # Symmetric NAT makes punching impossible (D-020): after a few seconds
+        # of silence, add the rendezvous server as a destination and let it
+        # forward. Both paths stay live; the receiver dedupes by seq.
+        if (
+            rdv is not None and not peer_locked and not rdv.relaying
+            and punch_started and now - punch_started >= relay_after
+        ):
+            rdv.start_relay()
+            sender.punch_targets = [*sender.punch_targets, rdv_server]
+            log.info(
+                "No direct path after %.0fs, falling back to relay via %s:%s",
+                relay_after, *rdv_server,
+            )
 
         local_pose, _ = capture.get_pose()
         peer_pose, last_rx = receiver.get_pose()
@@ -337,17 +358,28 @@ def run_multiplayer(
 
         # Exactly one center overlay per phase — never stacked
         if phase == "waiting":
-            if host:
+            # Name the stage we are actually stuck at, so a failure is never
+            # just a blank screen (D-020)
+            if receiver.bad_packets >= 10:
+                hud.draw_center_message(
+                    "VERSION MISMATCH", "both players need the same SHADOWCLASH version"
+                )
+            elif rdv is not None and rdv.error:
+                hud.draw_center_message("TOKEN NOT FOUND", "check the code, Esc to go back")
+            elif rdv is not None and rdv.peers:
+                hud.draw_center_message(
+                    "PEER FOUND",
+                    "connecting via relay..." if rdv.relaying else "connecting...",
+                )
+            elif host:
                 token_str = rdv.token if rdv is not None and rdv.token else "..."
                 hud.draw_center_message(
-                    "WAITING",
-                    f"LAN: {local_ip()}:{port}  or room token: {token_str}  (Esc cancels)",
+                    "WAITING", f"room token: {token_str}  (Esc cancels)"
                 )
             elif join_token is not None:
-                if rdv is not None and rdv.error:
-                    hud.draw_center_message("TOKEN NOT FOUND", "check the code, Esc to go back")
-                else:
-                    hud.draw_center_message("CONNECTING", f"room token {join_token} (Esc cancels)")
+                hud.draw_center_message("CONNECTING", f"room token {join_token} (Esc cancels)")
+            else:
+                hud.draw_center_message("CONNECTING", f"{ip}:{port} (Esc cancels)")
         elif phase == "countdown":
             hud.draw_countdown(
                 f"ROUND {tracker.round_no}",

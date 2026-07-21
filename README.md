@@ -13,9 +13,9 @@ over LAN or the internet.
 - **Single Player**: beat 10 villains with rising difficulty, from STREET PUNK
   to SHADOW KING
 - **Training**: practice strikes on a kicking pole with a live debug overlay
-- **VS Mode**: fight another player. On the same network, join by IP. Across
-  the internet, the host gets a 6-letter room token the other player types in.
-  No port forwarding needed.
+- **VS Mode**: fight another player anywhere. The host gets a 6-letter room
+  token, the other player types it in. Works on the same WiFi or across the
+  internet, with no port forwarding and nothing to configure.
 
 **How fighting works**: faster strikes deal more damage. Head hits hurt most,
 leg hits least. Raise your forearms or join both hands in front of you (like a
@@ -75,19 +75,29 @@ python -m shadowclash.main
 
 ---
 
-## Playing with a friend over the internet
+## Playing with a friend
 
 1. One player picks **VS Mode, Host** and reads out the 6-letter room token
    shown on the waiting screen.
-2. The other picks **VS Mode, Join** and types the token (or the host's IP if
-   you are on the same network).
+2. The other picks **VS Mode, Join** and types that token.
 3. The host picks how many rounds the match runs (best of 3, 5 or 7) in the
    settings panel; the joiner picks that up automatically.
 4. Once both players are in, a 30 second countdown runs, then the fight
    starts. The same countdown separates each round.
 
+The token works whether you are in the same room or on opposite sides of the
+world. The two games try to talk to each other directly, and fall back to
+routing through the SHADOWCLASH server if your network blocks that (common on
+mobile and campus connections). The waiting screen tells you which happened.
+
 Both players must run the **same version** of the game. VS Mode uses a
-versioned network protocol, so a v1.0.0 build cannot see a v1.0.1 build.
+versioned network protocol, so a v1.0.0 build cannot see a v1.0.1 build; if
+they disagree the screen says VERSION MISMATCH.
+
+*Playing offline with no internet at all?* The token needs the internet to
+work, so on an isolated LAN start the host with `--mode host`, read the
+address it prints, and have the other player run
+`--mode join --ip <that address>`.
 
 ## Requirements
 

@@ -48,6 +48,9 @@ network:
   # punching); leave host empty to disable and play LAN-only
   rendezvous_host: "65.20.110.24"
   rendezvous_port: 5556
+  # Seconds of failed hole punching before routing game packets through the
+  # rendezvous server instead (needed behind symmetric NAT, D-020)
+  relay_after_seconds: 6
 
 singleplayer:
   pole_hp: 100

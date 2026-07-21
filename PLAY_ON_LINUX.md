@@ -53,9 +53,9 @@ That opens the menu. Pick a mode with the arrow keys or mouse:
 - **Single Player**: fight a ladder of 10 villains with rising difficulty
 - **Training**: practice strikes on the kicking pole with a debug overlay (press D)
 - **VS Mode**: fight another player
-  - **Host** shows your LAN address and a 6-letter room token
-  - **Join** takes either the host's LAN IP (same network) or the room token
-    (anywhere on the internet)
+  - **Host** shows a 6-letter room token
+  - **Join** takes that token, whether your opponent is in the same room or
+    across the internet
 
 Step back until your whole body is visible to the camera. Fast strikes do more
 damage; joining both hands in front of you blocks like a Tekken guard.
@@ -70,5 +70,9 @@ damage; joining both hands in front of you blocks like a Tekken guard.
 - **No sound**: harmless, the game plays on. Sound needs the
   `--bind /run/user/$(id -u)` line.
 - **VS Mode over the internet**: only the room token is needed, no port
-  forwarding. If joining by token fails on both ends, your network may block
-  UDP hole punching; play on the same LAN with the IP instead.
+  forwarding. If a direct connection is impossible the game routes through the
+  SHADOWCLASH server automatically after a few seconds.
+- **VS Mode says VERSION MISMATCH**: both players need the same release.
+- **VS Mode with no internet at all**: the token needs the internet. On an
+  isolated LAN, add `--mode host` on one machine and
+  `--mode join --ip <host address>` on the other.

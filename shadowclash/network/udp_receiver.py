@@ -13,6 +13,9 @@ import numpy as np
 
 from shadowclash.network import protocol
 from shadowclash.network.protocol import DamageEvent
+from shadowclash.utils.logger import get_logger
+
+log = get_logger(__name__)
 
 
 class UdpReceiver:
@@ -31,6 +34,11 @@ class UdpReceiver:
         self.rdv_token: str | None = None
         self.rdv_peers: list[tuple[str, int]] = []
         self.rdv_error: str | None = None
+        self.rdv_relay_ok = False
+        # Datagrams that looked like ours but did not parse: almost always a
+        # peer running a different build, which is otherwise invisible.
+        self.bad_packets = 0
+        self._warned_bad = False
         self._running = False
         self._thread: threading.Thread | None = None
 
@@ -69,6 +77,8 @@ class UdpReceiver:
                 peers = [ep for ep in map(parse_endpoint, parts[2:]) if ep is not None]
                 if peers:
                     self.rdv_peers = peers
+            elif parts[1] == "RELAY":
+                self.rdv_relay_ok = True
             elif parts[1] == "ERR":
                 self.rdv_error = " ".join(parts[2:]) or "error"
 
@@ -85,6 +95,16 @@ class UdpReceiver:
                 continue
             packet = protocol.unpack(data)
             if packet is None:
+                with self._lock:
+                    self.bad_packets += 1
+                    warn = self.bad_packets == 10 and not self._warned_bad
+                    self._warned_bad = self._warned_bad or warn
+                if warn:
+                    log.warning(
+                        "Unreadable packets from %s: the other player is almost "
+                        "certainly running a different SHADOWCLASH version",
+                        addr,
+                    )
                 continue
             with self._lock:
                 self.peer_addr = addr
