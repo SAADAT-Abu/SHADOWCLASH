@@ -54,7 +54,7 @@ Tekken guard) to block. Stand back so your whole body is in the camera frame.
 
 **Option A, container image (recommended):** a single file with everything
 inside, runs on any distro with [Apptainer](https://apptainer.org) installed.
-Download it from [Zenodo](https://zenodo.org/records/21461081) and see
+Download it from [Zenodo](https://zenodo.org/records/21469739) and see
 [PLAY_ON_LINUX.md](PLAY_ON_LINUX.md) for the two-command setup and
 troubleshooting.
 
@@ -81,7 +81,13 @@ python -m shadowclash.main
    shown on the waiting screen.
 2. The other picks **VS Mode, Join** and types the token (or the host's IP if
    you are on the same network).
-3. Fight. Each player sees both fighters mirrored in the same arena.
+3. The host picks how many rounds the match runs (best of 3, 5 or 7) in the
+   settings panel; the joiner picks that up automatically.
+4. Once both players are in, a 30 second countdown runs, then the fight
+   starts. The same countdown separates each round.
+
+Both players must run the **same version** of the game. VS Mode uses a
+versioned network protocol, so a v1.0.0 build cannot see a v1.0.1 build.
 
 ## Requirements
 

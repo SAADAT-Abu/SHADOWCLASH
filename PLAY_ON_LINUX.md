@@ -28,7 +28,7 @@ against AI villains, a training pole, or another player over LAN or internet.
 ## Download
 
 ```bash
-wget -O shadowclash.sif "https://zenodo.org/records/21461081/files/shadowclash.sif?download=1"
+wget -O shadowclash.sif "https://zenodo.org/records/21469739/files/shadowclash.sif?download=1"
 ```
 
 Optional integrity check, the output should be `af087a9423fee8bdea3e4a28f61a453f`:
